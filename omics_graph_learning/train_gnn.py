@@ -480,6 +480,13 @@ def post_model_evaluation(
         epoch=0,
     )
 
+    # save final eval
+    np.save(run_dir / "outs.npy", outs.numpy())
+    np.save(run_dir / "labels.npy", labels.numpy())
+    for step, (out, label) in enumerate(zip(outs, labels)):
+        tb_logger.writer.add_scalar("Predictions", out.item(), step)
+        tb_logger.writer.add_scalar("Labels", label.item(), step)
+
     # pearson
     r, _ = pearsonr(outs, labels)
 
@@ -514,12 +521,6 @@ def post_model_evaluation(
         rmse=rmse,
         tb_logger=tb_logger,
     )
-
-    # map node indices back to original idx
-    # predictions_dict = {idx.item(): pred.item() for idx, pred in zip(original_indices, outs)}
-    # full_predictions = torch.zeros(data.num_nodes)
-    # for idx, pred in predictions_dict.items():
-    #     full_predictions[idx] = pred
 
 
 def _dump_metadata_json(
