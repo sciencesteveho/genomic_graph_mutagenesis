@@ -57,6 +57,128 @@ function _combine_chr_loops () {
 
 
 # =============================================================================
+# Combine loop calls
+# Args:
+#   1 - tissue name
+#   2 - deeploop type (e.g., 100000, 300000)
+# Output:
+#   combined loop file saved to 'combined_loop_callers' directory
+# =============================================================================
+combine_loop_callers() {
+    local tissue=$1
+    local deeploop_type=$2
+    local output_dir="combined_loop_callers"
+    local output_file="${output_dir}/${tissue}_loops.bedpe"
+    mkdir -p "$output_dir"
+
+    if [ -z "$tissue" ] || [ -z "$deeploop_type" ]; then
+        echo "Usage: combine_loop_callers <tissue_or_cell_line> <deeploop_type (e.g., 100000, 300000)>"
+        return 1
+    fi
+
+    local peakachu_file="peakachu/${tissue}_loops.bedpe"
+    local deepanchor_file="deepanchor/${tissue}_loops.bedpe"
+    local deeploop_file="deeploop/${deeploop_type}/${tissue}_loops.bedpe"
+
+    # verify input files
+    for file in "$peakachu_file" "$deepanchor_file" "$deeploop_file"; do
+        if [ ! -f "$file" ]; then
+            echo "Error: File '$file' does not exist."
+            return 1
+        fi
+    done
+
+    # cat, sort, dedupe
+    cat "$peakachu_file" "$deepanchor_file" "$deeploop_file" \
+        | sort -k1,1 -k2,2n -k3,3n \
+        | uniq > "$output_file"
+
+    echo "Combined loop callers for '$tissue' saved to '$output_file'"
+}
+
+
+# =============================================================================
+# Combine hi-c calls
+# Args:
+#   1 - tissue name
+#   2 - number of loops for adaptive coarsegrain
+#   3 - FDR number for filtered hi-c calls
+# Output:
+#   combined hi-c contacts saved to 'combined_hic' directory
+# =============================================================================
+combine_hic() {
+    local tissue="$1"
+    local adaptive_number="$2"
+    local hic_fdr="$3"
+    local output_dir="combined_hic"
+    local output_file="${output_dir}/${tissue}_contacts.bedpe"
+    mkdir -p "$output_dir"
+
+    if [ -z "$tissue" ] || [ -z "$adaptive_number" ] || [ -z "$hic_fdr" ]; then
+        echo "Usage: combine_hic <tissue_or_cell_line> <adaptive_number (e.g., 100000)> <hic_fdr (e.g., 0.001)>"
+        return 1
+    fi    
+
+    local adaptive_file="adaptivecoarsegrain/${adaptive_number}/${tissue}_contacts.bedpe"
+    local hic_file="fdr_filtered_hic/${hic_fdr}/${tissue}_contacts.bedpe"
+
+    # verify input files
+    for file in "$adaptive_file" "$hic_file"; do
+        if [ ! -f "$file" ]; then
+            echo "Error: File '$file' does not exist."
+            return 1
+        fi
+    done
+
+    # cat, sort, dedupe
+    cat "$adaptive_file" "$hic_file" | \
+    sort -k1,1 -k2,2n -k3,3n | uniq > "$output_file"
+
+    echo "Combined Hi-C for '$tissue' saved to '$output_file'"
+}
+
+
+# =============================================================================
+# Combine contacts
+# Args:
+#   1 - tissue name
+# Output:
+#   All contacts combined and saved to 'all_contacts' directory
+# =============================================================================
+combine_all() {
+    local tissue="$1"
+    local loop_file="combined_loop_callers/${tissue}_loops.bedpe"
+    local hic_file="combined_hic/${tissue}_contacts.bedpe"
+    local output_dir="all_contacts"
+    local output_file="${output_dir}/${tissue}_combined.bedpe"
+    mkdir -p "$output_dir"
+
+    # verify the separate inputs
+    if [ -z "$tissue" ]; then
+        echo "Usage: combine_all <tissue_or_cell_line>"
+        return 1
+    fi
+
+    if [ ! -f "$loop_file" ]; then
+        echo "Error: Combined loop file '$loop_file' does not exist. Please run combine_loop_callers first."
+        return 1
+    fi
+
+    if [ ! -f "$hic_file" ]; then
+        echo "Error: Combined HIC file '$hic_file' does not exist. Please run combine_hic first."
+        return 1
+    fi
+
+    # cat, sort, dedupe
+    cat "$loop_file" "$hic_file" | \
+    sort -k1,1 -k2,2n -k3,3n | uniq > "$output_file"
+
+    echo "All combined data for '$tissue' saved to '$output_file'"
+}
+
+
+
+# =============================================================================
 # Main function to perform centralized processing
 # =============================================================================
 function _main () {
@@ -176,3 +298,17 @@ _main \
     /ocean/projects/bio210019p/stevesho/raw_tissue_hic/contact_matrices/coolers/topk
 
 echo "Total time: $(convertsecs SECONDS)"
+
+
+# =============================================================================
+# code for combining callers - happens after running initial models
+# =============================================================================
+# combine loop callers
+# declare -a tissues=(
+#     "adrenal" "aorta" "gm12878" "h1_esc" "hepg2" "hippocampus" "hmec" "imr90" "k562" "left_ventricle" "liver" "lung" "nhek" "ovary" "pancreas" "skeletal_muscle" "small_intestine" "spleen"
+# )
+# for tissue in "${tissues[@]}"; do
+#     combine_loop_callers "$tissue" 100000
+#     combine_hic "$tissue" 100000 0.001
+#     # combine_all "$tissue"
+# done
