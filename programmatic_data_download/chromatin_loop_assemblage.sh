@@ -307,6 +307,6 @@ echo "Total time: $(convertsecs SECONDS)"
 # declare -a tissues=(
 #     "adrenal" "aorta" "gm12878" "h1_esc" "hepg2" "hippocampus" "hmec" "imr90" "k562" "left_ventricle" "liver" "lung" "nhek" "ovary" "pancreas" "skeletal_muscle" "small_intestine" "spleen"
 # )
-combine_loop_callers K562 100000
-combine_hic K562 100000 0.001
-combine_all K562
+combine_loop_callers k562 300000
+combine_hic k562 300000 0.001
+combine_all k562
