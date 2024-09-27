@@ -57,7 +57,7 @@ class ModelMetrics:
             "ci_upper": [],
             "final_test_pearson": [],
             "final_test_rmse": [],
-            "bootstrap_rmse": [],
+            "bootstrap_pearson": [],
         }
 
         for run_number in range(1, 4):
@@ -73,8 +73,8 @@ class ModelMetrics:
                     metrics["final_test_rmse"].append(
                         metrics_json.get("Final test RMSE", np.nan)
                     )
-                    metrics["bootstrap_rmse"].append(
-                        metrics_json.get("Bootstrap RMSE", np.nan)
+                    metrics["bootstrap_pearson"].append(
+                        metrics_json.get("Bootstrap pearson", np.nan)
                     )
             else:
                 print(f"CI file not found: {metrics_file}")
@@ -88,7 +88,7 @@ class ModelMetrics:
         metrics_to_compute = {
             "final_test_rmse": "final_test_rmse",
             "final_test_pearson": "final_test_pearson",
-            "bootstrap_rmse": "bootstrap_rmse",
+            "bootstrap_pearson": "bootstrap_pearson",
             "ci_lower": "ci_lower",
             "ci_upper": "ci_upper",
         }
@@ -105,8 +105,8 @@ class ModelMetrics:
             "final_test_pearson_mean",
             "final_test_rmse_mean",
             "final_test_rmse_std",
-            "bootstrap_rmse_mean",
-            "bootstrap_rmse_std",
+            "bootstrap_pearson_mean",
+            "bootstrap_pearson_std",
             "ci_lower_mean",
             "ci_upper_mean",
         ]
