@@ -24,6 +24,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
+from omics_graph_learning.config_handlers import ExperimentConfig
+from omics_graph_learning.config_handlers import TissueConfig
 import pandas as pd
 import psutil  # type: ignore
 from pybedtools import BedTool  # type: ignore
@@ -33,9 +35,6 @@ import seaborn as sns  # type: ignore
 import torch
 from torch_geometric.data import Data  # type: ignore
 import yaml  # type: ignore
-
-from omics_graph_learning.config_handlers import ExperimentConfig
-from omics_graph_learning.config_handlers import TissueConfig
 
 
 # decorator to track execution time

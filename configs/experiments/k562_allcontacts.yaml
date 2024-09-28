@@ -1,0 +1,84 @@
+---
+attribute_references:
+  gencode: gencode_v26_node_attr.bed
+  mirna: ensembl_mirna_coordinates_hg38.bed
+  mirnatargets: mirtargets_filtered.txt
+  ref_dir: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references
+  super_enhancers: se_node_attr.bed
+  tf_motifs: collapsed_motifs_overlapping_consensus_footprints_hg38.bed
+
+baseloops: allcontacts
+
+blacklist: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38-blacklist.v2.bed
+
+chromfile: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.chrom.sizes
+
+config_dir: /ocean/projects/bio210019p/stevesho/data/preprocess/ogl/configs
+
+derived_directories:
+  baseloop_dir: shared_data/processed_loops
+  expression_dir: shared_data/targets/expression
+  interaction_dir: shared_data/interaction
+  local_data_dir: shared_data/local
+  matrix_dir: shared_data/targets/matrices
+  raw_data_dir: raw_tissue_data
+  reference_dir: shared_data/references
+  regulatory_dir: shared_data/regulatory_elements
+  shared_data_dir: shared_data
+  target_dir: shared_data/targets
+  tpm_dir: shared_data/targets/tpm
+
+differentiate_tf: false
+
+experiment_name: regulatory_only_k562_allcontacts
+
+fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
+
+feat_window: 6250
+
+gene_gene: false
+
+graph_type: full
+
+interaction_types: null
+
+k_fold: null
+
+liftover: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/liftOver
+
+liftover_chain: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg19ToHg38.over.chain.gz
+
+log_transform: log2
+
+nodes: null
+
+onehot_node_feats: 2
+
+positional_encoding:
+  build_positional_encoding: true
+  train_positional_encoding: false
+
+rbp_network: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_network.txt
+
+rbp_proteins: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_proteins.txt
+
+regulatory_schema: intersect
+
+root_dir: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing
+
+tissues:
+  - k562
+
+training_targets:
+  average_activity_df: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/average_activity_df.pkl
+  expression_all_matrix: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct
+  expression_median_across_all: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/gtex_tpm_median_across_all_tissues.pkl
+  expression_median_matrix: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct
+  gencode_gtf: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/gencode_v26_genes_only_with_GTEx_targets.bed
+  protein_abundance_matrix: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/protein_relative_abundance_all_gtex.csv
+  protein_abundance_medians: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/protein_relative_abundance_median_gtex.csv
+  test_chrs:
+    - chr8
+    - chr9
+  val_chrs:
+    - chr10

@@ -23,6 +23,7 @@ log_progress () {
     echo -e "[$(date +%Y-%m-%dT%H:%M:%S%z)] "
 }
 
+
 # =============================================================================
 # Combine chromatin loops from two different files
 # Assumes files are in standard .bedpe format
@@ -175,7 +176,6 @@ combine_all() {
 
     echo "All combined data for '$tissue' saved to '$output_file'"
 }
-
 
 
 # =============================================================================
