@@ -295,7 +295,11 @@ class PipelineRunner:
                 "Number of GPUs must be specified when optimizing hyperparameters."
             )
         slurm_ids = []
-        num_trials = calculate_trials(self.args.n_gpus)
+        num_trials = (
+            calculate_trials(self.args.n_gpus, self.args.n_trials)
+            if self.args.n_trials
+            else calculate_trials(self.args.n_gpus, N_TRIALS)
+        )
         for _ in range(self.args.n_gpus):
             job_id = submit_slurm_job(
                 job_script="optimize_params.sh",
@@ -406,11 +410,11 @@ def run_tests() -> bool:
     return exit_code == 0  # pytest.ExitCode.OK is 0
 
 
-def calculate_trials(n_gpus: int) -> int:
+def calculate_trials(n_gpus: int, n_trials: int) -> int:
     """Calculate the number of trials to run for hyperparameter optimization
     (per gpu).
     """
-    return N_TRIALS // n_gpus
+    return n_trials // n_gpus
 
 
 def main() -> None:

@@ -162,6 +162,7 @@ class OGLCLIParser:
         )
         self.parser.add_argument("--dropout", type=float, default=0.1)
         self.parser.add_argument("--heads", type=int, default=None)
+        self.parser.add_argument("--n_trials", type=int)
         self.parser.add_argument(
             "--run_number",
             type=int,
