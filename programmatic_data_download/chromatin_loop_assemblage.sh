@@ -68,7 +68,7 @@ function _combine_chr_loops () {
 combine_loop_callers() {
     local tissue=$1
     local deeploop_type=$2
-    local output_dir="combined_loop_callers"
+    local output_dir="combinedloopcallers"
     local output_file="${output_dir}/${tissue}_loops.bedpe"
     mkdir -p "$output_dir"
 
@@ -92,6 +92,7 @@ combine_loop_callers() {
     # cat, sort, dedupe
     cat "$peakachu_file" "$deepanchor_file" "$deeploop_file" \
         | sort -k1,1 -k2,2n -k3,3n \
+        | cut -f1-6 \
         | uniq > "$output_file"
 
     echo "Combined loop callers for '$tissue' saved to '$output_file'"
@@ -111,7 +112,7 @@ combine_hic() {
     local tissue="$1"
     local adaptive_number="$2"
     local hic_fdr="$3"
-    local output_dir="combined_hic"
+    local output_dir="combinedhic"
     local output_file="${output_dir}/${tissue}_contacts.bedpe"
     mkdir -p "$output_dir"
 
@@ -132,8 +133,10 @@ combine_hic() {
     done
 
     # cat, sort, dedupe
-    cat "$adaptive_file" "$hic_file" | \
-    sort -k1,1 -k2,2n -k3,3n | uniq > "$output_file"
+    cat "$adaptive_file" "$hic_file" \
+        | sort -k1,1 -k2,2n -k3,3n \
+        | cut -f1-6 \
+        | uniq > "$output_file"
 
     echo "Combined Hi-C for '$tissue' saved to '$output_file'"
 }
@@ -148,10 +151,10 @@ combine_hic() {
 # =============================================================================
 combine_all() {
     local tissue="$1"
-    local loop_file="combined_loop_callers/${tissue}_loops.bedpe"
-    local hic_file="combined_hic/${tissue}_contacts.bedpe"
-    local output_dir="all_contacts"
-    local output_file="${output_dir}/${tissue}_combined.bedpe"
+    local loop_file="combinedloopcallers/${tissue}_loops.bedpe"
+    local hic_file="combinedhic/${tissue}_contacts.bedpe"
+    local output_dir="allcontacts"
+    local output_file="${output_dir}/${tissue}_contacts.bedpe"
     mkdir -p "$output_dir"
 
     # verify the separate inputs
@@ -171,8 +174,10 @@ combine_all() {
     fi
 
     # cat, sort, dedupe
-    cat "$loop_file" "$hic_file" | \
-    sort -k1,1 -k2,2n -k3,3n | uniq > "$output_file"
+    cat "$loop_file" "$hic_file" \
+        | sort -k1,1 -k2,2n -k3,3n \
+        | cut -f1-6 \
+        | uniq > "$output_file"
 
     echo "All combined data for '$tissue' saved to '$output_file'"
 }
