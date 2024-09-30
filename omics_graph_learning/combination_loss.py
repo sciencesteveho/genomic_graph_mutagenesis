@@ -109,5 +109,5 @@ class RMSEandBCELoss(nn.Module):
 
         return F.binary_cross_entropy_with_logits(
             classification_output[mask].squeeze(),
-            classification_target[mask].float(),
+            classification_target[mask].squeeze(),
         )
