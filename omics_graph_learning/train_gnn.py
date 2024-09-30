@@ -27,6 +27,7 @@ from torch_geometric.loader import NeighborLoader  # type: ignore
 from tqdm import tqdm  # type: ignore
 
 from omics_graph_learning.architecture_builder import build_gnn_architecture
+from omics_graph_learning.combination_loss import RMSEandBCELoss
 from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.graph_to_pytorch import GraphToPytorch
 from omics_graph_learning.perturb_graph import PerturbationConfig
@@ -39,7 +40,8 @@ from omics_graph_learning.utils.common import tensor_out_to_array
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import \
+    plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 
@@ -103,24 +105,146 @@ class GNNTrainer:
         self.logger = logger
         self.tb_logger = tb_logger
 
-    def log_tensorboard_data(
+        self.criterion = RMSEandBCELoss(alpha=0.8)
+
+    def _forward_pass(
         self,
+        data: torch_geometric.data.Data,
+        mask: torch.Tensor,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        """Perform forward pass and compute losses and outputs."""
+        data = data.to(self.device)
+
+        regression_out, logits = self.model(
+            x=data.x,
+            edge_index=data.edge_index,
+            mask=mask,
+        )
+
+        loss, regression_loss, classification_loss = self.criterion(
+            regression_output=regression_out,
+            regression_target=data.y,
+            classification_output=logits,
+            classification_target=data.class_labels,
+            mask=mask,
+        )
+
+        # collect masked outputs and labels
+        regression_out_masked = self._ensure_tensor_dim(regression_out[mask])
+        labels_masked = self._ensure_tensor_dim(data.y[mask])
+
+        classification_out_masked = self._ensure_tensor_dim(logits[mask])
+        class_labels_masked = self._ensure_tensor_dim(data.class_labels[mask])
+
+        return (
+            loss,
+            regression_loss,
+            classification_loss,
+            regression_out_masked,
+            labels_masked,
+            classification_out_masked,
+            class_labels_masked,
+        )
+
+    def _train_single_batch(
+        self,
+        data: torch_geometric.data.Data,
         epoch: int,
-        last_batch: bool = False,
-    ) -> None:
-        """Log data to tensorboard on the last batch of an epoch."""
-        if last_batch:
-            self.tb_logger.log_learning_rate(self.optimizer, epoch)
-            self.tb_logger.log_summary_statistics(self.model, epoch)
-            self.tb_logger.log_aggregate_module_metrics(self.model, epoch)
-            self.tb_logger.log_gradient_norms(self.model, epoch)
+        batch_idx: int,
+        total_batches: int,
+    ) -> Tuple[float, float, float]:
+        """Train a single batch."""
+        self.optimizer.zero_grad()
+
+        # forward pass
+        mask = data.train_mask_loss
+
+        (
+            loss,
+            regression_loss,
+            classification_loss,
+            _,
+            _,
+            _,
+            _,
+        ) = self._forward_pass(data, mask)
+
+        # backpropagation
+        loss.backward()
+
+        # log if last batch of epoch
+        if self.tb_logger:
+            self._log_tensorboard_data(
+                epoch=epoch,
+                last_batch=batch_idx == total_batches - 1,
+            )
+
+        # check for NaN gradients
+        self._check_for_nan_gradients()
+        self.optimizer.step()
+
+        # step warmup schedulers, if applicable
+        if isinstance(self.scheduler, LRScheduler) and not isinstance(
+            self.scheduler, ReduceLROnPlateau
+        ):
+            self.scheduler.step()
+
+        batch_size_mask = int(mask.sum())
+        return (
+            loss.item() * batch_size_mask,
+            regression_loss.item() * batch_size_mask,
+            classification_loss.item() * batch_size_mask,
+        )
+
+    def _evaluate_single_batch(
+        self,
+        data: torch_geometric.data.Data,
+        mask: str,
+    ) -> Tuple[float, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Evaluate a single batch."""
+        mask = getattr(data, f"{mask}_mask_loss")
+        if mask.sum() == 0:
+            return (
+                0.0,
+                torch.tensor([]),
+                torch.tensor([]),
+                torch.tensor([]),
+                torch.tensor([]),
+            )
+        # forward pass
+        (
+            loss,
+            _,
+            _,
+            regression_out_masked,
+            labels_masked,
+            classification_out_masked,
+            class_labels_masked,
+        ) = self._forward_pass(data, mask)
+
+        batch_size_mask = int(mask.sum())
+        return (
+            loss.item() * batch_size_mask,
+            regression_out_masked.cpu(),
+            labels_masked.cpu(),
+            classification_out_masked.cpu(),
+            class_labels_masked.cpu(),
+        )
 
     def train(
         self,
         train_loader: torch_geometric.data.DataLoader,
         epoch: int,
         subset_batches: Optional[int] = None,
-    ) -> float:
+    ) -> Tuple[float, float, float]:
         """Train GNN model on graph data"""
         self.model.train()
         pbar = tqdm(total=len(train_loader))
@@ -128,55 +252,34 @@ class GNNTrainer:
             f"\nTraining {self.model.__class__.__name__} model @ epoch: {epoch} - "
         )
 
-        total_loss = float(0)
+        total_loss = total_regression = total_classification = float(0)
         total_examples = 0
+        total_batches = len(train_loader)
         for batch_idx, data in enumerate(train_loader):
             if subset_batches and batch_idx >= subset_batches:
                 break
 
-            self.optimizer.zero_grad()
-            data = data.to(self.device)
-
-            out = self.model(
-                x=data.x,
-                edge_index=data.edge_index,
-                regression_mask=data.train_mask_loss,
+            loss, regression_loss, classification_loss = self._train_single_batch(
+                data=data,
+                epoch=epoch,
+                batch_idx=batch_idx,
+                total_batches=total_batches,
             )
-
-            # check if there are regression nodes in the batch
-            if data.train_mask_loss.sum() > 0:
-                mse_loss = F.mse_loss(
-                    out[data.train_mask_loss].squeeze(),
-                    data.y[data.train_mask_loss].squeeze(),
-                )
-                mse_loss.backward()
-
-                # log if last batch of epoch
-                if self.tb_logger:
-                    self.log_tensorboard_data(
-                        epoch=epoch,
-                        last_batch=batch_idx == len(train_loader) - 1,
-                    )
-
-                # check for NaN gradients
-                for name, param in self.model.named_parameters():
-                    if param.grad is not None and torch.isnan(param.grad).any():
-                        print(f"NaN gradient detected in {name}")
-
-                self.optimizer.step()
-
-                # step warmup schedulers
-                if isinstance(self.scheduler, LRScheduler) and not isinstance(
-                    self.scheduler, ReduceLROnPlateau
-                ):
-                    self.scheduler.step()
-
-                total_loss += float(mse_loss) * int(data.train_mask_loss.sum())
-                total_examples += int(data.train_mask_loss.sum())
+            total_loss += loss
+            total_regression += regression_loss
+            total_classification += classification_loss
+            total_examples += int(data.train_mask_loss.sum())
             pbar.update(1)
 
         pbar.close()
-        return total_loss / total_examples
+        final_loss = total_loss / total_examples if total_examples > 0 else 0.0
+        final_regression = (
+            total_regression / total_examples if total_examples > 0 else 0.0
+        )
+        final_classification = (
+            total_classification / total_examples if total_examples > 0 else 0.0
+        )
+        return final_loss, final_regression, final_classification
 
     @torch.no_grad()
     def evaluate(
@@ -185,7 +288,7 @@ class GNNTrainer:
         epoch: int,
         mask: str,
         subset_batches: Optional[int] = None,
-    ) -> Tuple[float, torch.Tensor, torch.Tensor, float]:
+    ) -> Tuple[float, float, torch.Tensor, torch.Tensor, float, float]:
         """Base function for model evaluation or inference."""
         self.model.eval()
         pbar = tqdm(total=len(data_loader))
@@ -193,56 +296,56 @@ class GNNTrainer:
             f"\nEvaluating {self.model.__class__.__name__} model @ epoch: {epoch}"
         )
 
-        outs, labels = [], []
+        total_loss = float(0)
+        total_examples = 0
+        regression_outs, regression_labels = [], []
+        classification_outs, classification_labels = [], []
 
         for batch_idx, data in enumerate(data_loader):
             if subset_batches and batch_idx >= subset_batches:
                 break
 
-            data = data.to(self.device)
-            regression_mask = getattr(data, f"{mask}_mask_loss")
-
-            # skip batch if no nodes to evaluate
-            if regression_mask.sum() == 0:
-                pbar.update(1)
-                continue
-
-            # forward pass
-            out = self.model(
-                x=data.x,
-                edge_index=data.edge_index,
-                regression_mask=regression_mask,
+            loss, reg_out, reg_label, cls_out, cls_label = self._evaluate_single_batch(
+                data=data,
+                mask=mask,
             )
+            total_loss += loss
+            total_examples += int(getattr(data, f"{mask}_mask_loss").sum())
 
-            # ensure output is 1D
-            out_masked = out[regression_mask].squeeze()
-            if out_masked.dim() == 0:
-                out_masked = out_masked.unsqueeze(0)
-            outs.append(out_masked.cpu())
-
-            # ensure labels are 1D
-            labels_masked = data.y[regression_mask].squeeze()
-            if labels_masked.dim() == 0:
-                labels_masked = labels_masked.unsqueeze(0)
-            labels.append(labels_masked.cpu())
+            regression_outs.append(reg_out)
+            regression_labels.append(reg_label)
+            classification_outs.append(cls_out)
+            classification_labels.append(cls_label)
 
             pbar.update(1)
+
         pbar.close()
+        average_loss = total_loss / total_examples if total_examples > 0 else 0.0
 
-        # check if no regression nodes in the batches
-        if not outs or not labels:
-            return 0.0, torch.tensor([]), torch.tensor([]), 0.0
+        # compute regression metrics
+        rmse, pearson_r = self._compute_regression_metrics(
+            regression_outs, regression_labels
+        )
 
-        # calculate RMSE
-        predictions = torch.cat(outs)
-        targets = torch.cat(labels)
-        mse = F.mse_loss(predictions, targets)
-        rmse = torch.sqrt(mse)
+        # compute classification metrics
+        accuracy = self._compute_classification_metrics(
+            classification_outs, classification_labels
+        )
 
-        # calculate Pearson correlation
-        r, _ = pearsonr(predictions, targets)
+        # log metrics
+        self.logger.info(
+            f"Epoch: {epoch:03d}, Loss: {average_loss:.3f}, RMSE: {rmse:.3f}, "
+            f"Pearson's R: {pearson_r:.3f}, Accuracy: {accuracy:.3f}"
+        )
 
-        return rmse.item(), predictions, targets, r
+        return (
+            average_loss,
+            rmse,
+            torch.cat(regression_outs),
+            torch.cat(regression_labels),
+            pearson_r,
+            accuracy,
+        )
 
     def train_model(
         self,
@@ -270,50 +373,50 @@ class GNNTrainer:
         stop_counter = 0
 
         for epoch in range(epochs + 1):
+            self.logger.info(f"Epoch: {epoch:03d}")
 
             # train
-            loss = self.train(train_loader=train_loader, epoch=epoch)
-            self.logger.info(f"Epoch: {epoch:03d}, Train loss: {loss}")
+            train_loss, train_regression_loss, train_classification_loss = self.train(
+                train_loader=train_loader, epoch=epoch
+            )
 
             # validation
-            val_rmse, _, _, r = self.evaluate(
+            val_loss, val_rmse, _, _, val_r, val_accuracy = self.evaluate(
                 data_loader=val_loader, epoch=epoch, mask="val"
-            )
-            self.logger.info(
-                f"Epoch: {epoch:03d}, "
-                f"Validation RMSE: {val_rmse:.4f}, "
-                f"Validation Pearson's R: {r:.4f}",
             )
 
             # test
-            test_rmse, _, _, r = self.evaluate(
+            test_loss, test_rmse, _, _, test_r, test_accuracy = self.evaluate(
                 data_loader=test_loader, epoch=epoch, mask="test"
-            )
-            self.logger.info(
-                f"Epoch: {epoch:03d}, "
-                f"Test RMSE: {test_rmse:.4f} "
-                f"Test Pearson's R: {r:.4f}"
             )
 
             # log metrics to tensorboard
             metrics = {
-                "Training loss": loss,
+                "Training loss": train_loss,
+                "Training regression loss": train_regression_loss,
+                "Training classification loss": train_classification_loss,
+                "Validation loss": val_loss,
+                "Validation Pearson's R": val_r,
+                "Validation accuracy": val_accuracy,
                 "Validation RMSE": val_rmse,
-                "Validation Pearson's R": r,
+                "Test loss": test_loss,
+                "Test Pearson's R": test_r,
+                "Test accuracy": test_accuracy,
                 "Test RMSE": test_rmse,
-                "Test Pearson's R": r,
             }
             self.tb_logger.log_metrics(metrics, epoch)
+            for key, value in metrics.items():
+                self.logger.info(f"{key}: {value:.3f}")
 
             # step scheduler if normal plateau scheduler
             if isinstance(self.scheduler, ReduceLROnPlateau):
-                self.scheduler.step(val_rmse)
+                self.scheduler.step(val_loss)
 
             # early stopping logic
             if args.early_stop:
-                if val_rmse < best_validation:
+                if val_loss < best_validation:
                     stop_counter = 0
-                    best_validation = val_rmse
+                    best_validation = val_loss
                     torch.save(
                         self.model.state_dict(),
                         model_dir / f"{args.model}_best_model.pt",
@@ -328,6 +431,64 @@ class GNNTrainer:
                     break
 
         return self.model, best_validation, stop_counter == EARLY_STOP_PATIENCE
+
+    def _log_tensorboard_data(
+        self,
+        epoch: int,
+        last_batch: bool = False,
+    ) -> None:
+        """Log data to tensorboard on the last batch of an epoch."""
+        if last_batch:
+            self.tb_logger.log_learning_rate(self.optimizer, epoch)
+            self.tb_logger.log_summary_statistics(self.model, epoch)
+            self.tb_logger.log_aggregate_module_metrics(self.model, epoch)
+            self.tb_logger.log_gradient_norms(self.model, epoch)
+
+    def _check_for_nan_gradients(self) -> None:
+        """Check for NaN gradients in model parameters."""
+        for name, param in self.model.named_parameters():
+            if param.grad is not None and torch.isnan(param.grad).any():
+                print(f"NaN gradient detected in {name}")
+
+    @staticmethod
+    def _compute_regression_metrics(
+        regression_outs: List[torch.Tensor],
+        regression_labels: List[torch.Tensor],
+    ) -> Tuple[float, float]:
+        """Compute RMSE and Pearson's R for regression task."""
+        if not regression_outs or not regression_labels:
+            return 0.0, 0.0
+
+        predictions = torch.cat(regression_outs).squeeze()
+        targets = torch.cat(regression_labels).squeeze()
+        mse = F.mse_loss(predictions, targets)
+        rmse = torch.sqrt(mse).item()
+        pearson_r, _ = pearsonr(predictions.numpy(), targets.numpy())
+
+        return rmse, pearson_r
+
+    @staticmethod
+    def _compute_classification_metrics(
+        classification_outs: List[torch.Tensor],
+        classification_labels: List[torch.Tensor],
+    ) -> float:
+        """Compute accuracy for classification task."""
+        if not classification_outs or not classification_labels:
+            return 0.0
+
+        logits = torch.cat(classification_outs).squeeze()
+        labels = torch.cat(classification_labels).squeeze()
+        probs = torch.sigmoid(logits)
+        preds = (probs > 0.5).long()
+        return (preds == labels).float().mean().item()
+
+    @staticmethod
+    def _ensure_tensor_dim(tensor: torch.Tensor) -> torch.Tensor:
+        """Ensure tensor has the correct dimensions for evaluation."""
+        tensor = tensor.squeeze()
+        if tensor.dim() == 0:
+            tensor = tensor.unsqueeze(0)
+        return tensor
 
 
 def get_seed(run_number: int) -> int:
@@ -464,8 +625,6 @@ def post_model_evaluation(
     else:
         raise ValueError("Model is None. Cannot plot performance")
 
-    # all neighors inference
-    # if cuda out of memory error, use normal inference
     post_eval_trainer = GNNTrainer(
         model=model,
         device=device,
@@ -474,7 +633,7 @@ def post_model_evaluation(
         tb_logger=tb_logger,
     )
 
-    rmse, outs, labels, _ = post_eval_trainer.evaluate(
+    loss, rmse, outs, labels, pearson_r, accuracy = post_eval_trainer.evaluate(
         data_loader=data_loader,
         mask="test",
         epoch=0,
@@ -487,28 +646,24 @@ def post_model_evaluation(
         tb_logger.writer.add_scalar("Predictions", out.item(), step)
         tb_logger.writer.add_scalar("Labels", label.item(), step)
 
-    # pearson
-    r, _ = pearsonr(outs, labels)
-
     # bootstrap evaluation
     mean_correlation, ci_lower, ci_upper = bootstrap_evaluation(
         predictions=outs,
         labels=labels,
     )
 
-    logger.info(f"Final test pearson: {r:.4f}")
-    logger.info(f"Final test RMSE: {rmse:.4f}")
-    logger.info(
-        f"Bootstrap Pearson: {mean_correlation:.4f} [{ci_lower:.4f}, {ci_upper:.4f}]"
-    )
-
     metrics = {
-        "Final test pearson": r,
+        "Final test loss": loss,
+        "Final test pearson": pearson_r,
         "Final test RMSE": rmse,
+        "Final test accuracy": accuracy,
         "Bootstrap pearson": mean_correlation,
         "CI lower": ci_lower,
         "CI upper": ci_upper,
     }
+
+    for metric, value in metrics.items():
+        logger.info(f"{metric}: {value:.3f}")
 
     tb_logger.log_metrics(metrics, 0)
     with open(run_dir / "eval_metrics.json", "w") as output:

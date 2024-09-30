@@ -166,59 +166,66 @@ def train_and_evaluate(
     min_epochs: int = 0,
 ) -> Tuple[float, float]:
     """Run training and evaluation."""
-    best_r = -float("inf")
-    best_rmse = float("inf")
+    best_loss = float("inf")
+    best_pearson_r = -float("inf")
     early_stop_counter = 0
 
     for epoch in range(EPOCHS + 1):
-        loss = trainer.train(train_loader=train_loader, epoch=epoch)
-        logger.info(f"Epoch {epoch}, Loss: {loss}")
+        train_loss, _, _ = trainer.train(train_loader=train_loader, epoch=epoch)
+        logger.info(f"Epoch {epoch}, Loss: {train_loss:.3f}")
 
-        if np.isnan(loss):
+        if np.isnan(train_loss):
             logger.info(f"Trial {trial.number} pruned at epoch {epoch} due to NaN loss")
             raise optuna.exceptions.TrialPruned()
 
         # validation
-        rmse, pred_tensor, target_tensor, _ = trainer.evaluate(
+        (
+            val_loss,
+            val_rmse,
+            _,
+            _,
+            val_pearson_r,
+            val_accuracy,
+        ) = trainer.evaluate(
             data_loader=val_loader,
             epoch=epoch,
             mask="val",
         )
 
-        predictions = tensor_out_to_array(pred_tensor)
-        targets = tensor_out_to_array(target_tensor)
-
         # calculate metrics on validation set
-        r, p_val = pearsonr(predictions, targets)
-        logger.info(f"Validation Pearson's R: {r}, p-value: {p_val}, RMSE: {rmse}")
+        logger.info(
+            f"Validation loss: {val_loss:.3f}, Pearson's R: {val_pearson_r:.3f}, "
+            f"RMSE: {val_rmse:.3f}, Accuracy: {val_accuracy:.3f}"
+        )
 
-        if np.isnan(rmse):
-            logger.info(f"Trial {trial.number} pruned at epoch {epoch} due to NaN RMSE")
+        if np.isnan(val_loss):
+            logger.info(f"Trial {trial.number} pruned at epoch {epoch} due to NaN loss")
             raise optuna.exceptions.TrialPruned()
 
         # early stopping
-        if r > best_r:
-            best_r = r
-            best_rmse = rmse
+        if val_loss < best_loss:
+            best_loss = val_loss
+            best_pearson_r = val_pearson_r
             early_stop_counter = 0
         else:
             early_stop_counter += 1
-            if early_stop_counter >= PATIENCE and epoch >= min_epochs:
-                logger.info(f"Early stopping at epoch {epoch}")
-                break
+
+        if early_stop_counter >= PATIENCE and epoch >= min_epochs:
+            logger.info(f"Early stopping at epoch {epoch}")
+            break
 
         # report for pruning
         if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step(rmse)
+            scheduler.step(val_loss)
 
-        trial.report(r, epoch)
+        trial.report(val_loss, epoch)
 
         # handle pruning based on the intermediate value.
         if trial.should_prune():
             logger.info(f"Trial {trial.number} pruned at epoch {epoch}")
             raise optuna.exceptions.TrialPruned()
 
-    return best_r, best_rmse
+    return best_loss, best_pearson_r
 
 
 def get_objective_loaders(
@@ -255,7 +262,8 @@ def suggest_and_log_hyperparameters(
     logger.info(f"Model Params: {model_params}")
     logger.info(f"Train Params: {train_params}")
     logger.info("=" * 50)
-    logger.handlers[0].flush()
+    for handler in logger.handlers:
+        handler.flush()
     return model_params, train_params
 
 
@@ -378,14 +386,15 @@ def objective(
             min_epochs = 0
 
         # training loop
-        best_r, _ = train_and_evaluate(
+        best_loss, best_pearson_r = train_and_evaluate(
             trial, trainer, train_loader, val_loader, scheduler, logger, min_epochs
         )
 
-        trial.set_user_attr("best_r", best_r)  # save best rmse
-        return best_r
+        trial.set_user_attr("best_loss", best_loss)  # save best loss
+        trial.set_user_attr("best_pearson_r", best_pearson_r)  # save best pearson r
+        return best_loss
     except RuntimeError as e:
-        return handle_cuda_out_of_memory_error(e=e, trial=trial, logger=logger)
+        handle_cuda_out_of_memory_error(e=e, trial=trial, logger=logger)
 
 
 def handle_cuda_out_of_memory_error(
@@ -421,7 +430,7 @@ def run_optimization(
         study_name=study_name,
         storage=storage,
         load_if_exists=True,
-        direction="maximize",
+        direction="minimize",
         pruner=optuna.pruners.HyperbandPruner(
             min_resource=MIN_RESOURCE,
             max_resource=EPOCHS,

@@ -141,6 +141,12 @@ class ModularGNN(nn.Module):
     different convolutional operators, convolutional, linear layers, residual
     connection types, and task heads.
 
+    This model is design to regress log2 values of gene expression (RNA-seq) or
+    log2 tpm. Thus, the distribution is bimodal, so the model employs an
+    auxiliary task to simultaneously predict the class of each target (classes
+    are split via the bimodality of the targets, log2 tpm < 0 and log2 tpm >=
+    0).
+
     Attributes:
         embedding_size: Hidden size / width.
         out_channels: Output size (likely 1).
@@ -208,15 +214,23 @@ class ModularGNN(nn.Module):
         )
 
         # initialize task head(s)
-        self.task_head: Union[AttentionTaskHead, nn.Linear]
+        self.regression_task_head: Union[AttentionTaskHead, nn.Linear]
+        self.classification_task_head: Union[AttentionTaskHead, nn.Linear]
         if self.attention_task_head:
-            self.task_head = AttentionTaskHead(
+            self.regression_task_head = AttentionTaskHead(
                 embedding_size=embedding_size,
                 out_channels=out_channels,
             )
+            self.classification_task_head = AttentionTaskHead(
+                embedding_size=embedding_size,
+                out_channels=1,  # binary classification
+            )
         else:
-            self.task_head = self._general_task_head(
+            self.regression_task_head = self._general_task_head(
                 in_size=embedding_size, out_size=out_channels
+            )
+            self.classification_task_head = self._general_task_head(
+                in_size=embedding_size, out_size=1
             )
 
         # create linear projection for residual connections
@@ -233,14 +247,14 @@ class ModularGNN(nn.Module):
         self,
         x: torch.Tensor,
         edge_index: torch.Tensor,
-        regression_mask: torch.Tensor,
-    ) -> torch.Tensor:
+        mask: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the neural network.
 
         Args:
             x: The input tensor.
             edge_index: The edge index tensor.
-            regression_mask: Boolean mask of shape (num_nodes,) indicating which
+            mask: Boolean mask of shape (num_nodes,) indicating which
             nodes should be regressed. True for nodes to be regressed, False
             otherwise.
 
@@ -277,12 +291,24 @@ class ModularGNN(nn.Module):
                 layer_norms=self.layer_norms,
                 activation=self.activation,
                 dropout_rate=self.dropout_rate,
+                training=self.training,
             )
 
-            # apply task head
-            return compute_masked_regression(
-                task_head=self.task_head, x=x, regression_mask=regression_mask
+            # apply regression task head
+            regression_out = compute_masked_output(
+                task_head=self.regression_task_head,
+                x=x,
+                mask=mask,
             )
+
+            # apply classification task head
+            logits = compute_masked_output(
+                task_head=self.classification_task_head,
+                x=x,
+                mask=mask,
+            )
+
+            return regression_out, logits
         except RuntimeError as e:
             if "CUDA error" in str(e):
                 print(
@@ -488,21 +514,27 @@ class DeeperGCN(nn.Module):
             self.layer_norms.append(LayerNorm(embedding_size))
 
         # specify task head
-        self.task_head: Union[AttentionTaskHead, nn.Linear]
+        self.regression_task_head: Union[AttentionTaskHead, nn.Linear]
+        self.classification_task_head: Union[AttentionTaskHead, nn.Linear]
         if attention_task_head:
-            self.task_head = AttentionTaskHead(
+            self.regression_task_head = AttentionTaskHead(
                 embedding_size=embedding_size,
                 out_channels=out_channels,
             )
+            self.classification_task_head = AttentionTaskHead(
+                embedding_size=embedding_size,
+                out_channels=1,  # binary classification
+            )
         else:
-            self.task_head = Linear(embedding_size, out_channels)
+            self.regression_task_head = Linear(embedding_size, out_channels)
+            self.classification_task_head = Linear(embedding_size, 1)
 
     def forward(
         self,
         x: torch.Tensor,
         edge_index: torch.Tensor,
-        regression_mask: torch.Tensor,
-    ) -> torch.Tensor:
+        mask: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the neural network.
 
         Args:
@@ -523,12 +555,20 @@ class DeeperGCN(nn.Module):
             layer_norms=self.layer_norms,
             activation=self.activation,
             dropout_rate=self.dropout_rate,
+            training=self.training,
         )
 
-        # apply task head
-        return compute_masked_regression(
-            task_head=self.task_head, x=x, regression_mask=regression_mask
+        # regression task
+        regression_out = compute_masked_output(
+            task_head=self.regression_task_head, x=x, mask=mask
         )
+
+        # classification task
+        logits = compute_masked_output(
+            task_head=self.classification_task_head, x=x, mask=mask
+        )
+
+        return regression_out, logits
 
     def get_deepergcn_layers(
         self,
@@ -678,48 +718,49 @@ def get_activation_function(activation: str) -> Callable[[torch.Tensor], torch.T
     try:
         return activations[activation]
     except KeyError as error:
-        raise ValueError(
+        raise KeyError(
             "Invalid activation function. Supported: relu, leakyrelu, gelu"
         ) from error
 
 
-def compute_masked_regression(
+def compute_masked_output(
     task_head: Union[AttentionTaskHead, nn.Linear],
     x: torch.Tensor,
-    regression_mask: torch.Tensor,
+    mask: torch.Tensor,
 ) -> torch.Tensor:
-    """Apply the task head to produce the output tensor with regression only
-    to the specified indices."""
-    # process only regression nodes
-    regression_indices = regression_indices_tensor(regression_mask).to(x.device)
+    """Apply the task head to produce the output tensor with task applied only
+    to the specified indices.
+    """
+    # process only task nodes
+    indices = indices_tensor(mask).to(x.device)
 
     # return a tensor of zeros if no regression nodes
-    if regression_indices.numel() == 0:
+    if indices.numel() == 0:
         return torch.zeros(x.size(0), device=x.device)
 
-    out = task_head(x[regression_indices])
-    return output_tensor(x=x, out=out, regression_indices=regression_indices)
+    out = task_head(x[indices])
+    return output_tensor(x=x, out=out, indices=indices)
 
 
 def output_tensor(
-    x: torch.Tensor, out: torch.Tensor, regression_indices: torch.Tensor
+    x: torch.Tensor, out: torch.Tensor, indices: torch.Tensor
 ) -> torch.Tensor:
     """Produce the output tensor for the model. Creates a tensor of output shape
-    with all zeroes, before filling in values for the regression indices.
+    with all zeroes, before filling in values for the indices.
     """
     full_out = torch.zeros(x.size(0), device=x.device)
     out = out.to(x.device)
 
-    # fill in the outputs only for regression indices if they exist
-    if regression_indices.numel() > 0:
-        full_out[regression_indices] = out.squeeze()
+    # fill in the outputs only for indices that exist
+    if indices.numel() > 0:
+        full_out[indices] = out.squeeze()
 
     return full_out
 
 
-def regression_indices_tensor(regression_mask: torch.Tensor) -> torch.Tensor:
-    """Get the indices of the regression nodes from the regression mask."""
-    return torch.where(regression_mask)[0]
+def indices_tensor(mask: torch.Tensor) -> torch.Tensor:
+    """Get the indices of the task nodes from the mask."""
+    return torch.where(mask)[0]
 
 
 def apply_mlp_layers(
@@ -727,11 +768,12 @@ def apply_mlp_layers(
     linear_layers: nn.ModuleList,
     layer_norms: nn.ModuleList,
     activation: Callable[[torch.Tensor], torch.Tensor],
+    training: bool = True,
     dropout_rate: Optional[float] = None,
 ) -> torch.Tensor:
     """Apply linear layers, normalization, activation, and optional dropout."""
     for linear_layer, layer_norm in zip(linear_layers, layer_norms):
         x = activation(layer_norm(linear_layer(x)))
         if isinstance(dropout_rate, float):
-            x = F.dropout(x, p=dropout_rate, training=True)
+            x = F.dropout(x, p=dropout_rate, training=training)
     return x

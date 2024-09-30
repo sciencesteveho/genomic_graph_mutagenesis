@@ -188,8 +188,12 @@ class GraphToPytorch:
         for mask_name, mask in masks.items():
             setattr(data, mask_name, mask.contiguous())
 
-        # add target values to the data object
+        # add regression targets to the data object
         data.y = targets.T.contiguous()
+
+        # add class labels to the data object
+        # class 1 if log2 TPM >= 0, else Class 0
+        data.class_labels = (data.y >= 0).long()
 
         # save average edges for the graph
         self.save_average_edges(data=data)
@@ -240,7 +244,7 @@ def _assign_nodes_to_split(
     graph_data: Dict[str, Any],
     test_chrs: List[str],
     val_chrs: List[str],
-    num_optimization_chrs: int = 8,
+    num_optimization_chrs: int = 12,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """Assign nodes to train, test, and validation sets according to their chr.
 
