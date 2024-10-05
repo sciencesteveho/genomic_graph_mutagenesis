@@ -20,11 +20,6 @@ from omics_graph_learning.optimize_hyperparameters import set_optim_directory
 from omics_graph_learning.utils.common import setup_logging
 
 
-def custom_sort_pearson(val: float) -> float:
-    """Custom sort to move inf values to bottom."""
-    return -float("inf") if np.isinf(val) else val
-
-
 def display_results(
     study: optuna.Study, optuna_dir: Path, logger: logging.Logger
 ) -> None:
@@ -40,11 +35,9 @@ def display_results(
         f"{len(study.get_trials(states=[optuna.trial.TrialState.COMPLETE]))}"
     )
 
-    # save to csv
+    # save to csv and sort via RMSe
     df = study.trials_dataframe()
-    df = df.sort_values(
-        "value", key=lambda x: x.map(custom_sort_pearson), ascending=False
-    )
+    df = df.sort_values("value", ascending=True)
 
     logger.info("Best trial:")
     logger.info(f"Best Pearson's r: {df['value'].iloc[0]}")

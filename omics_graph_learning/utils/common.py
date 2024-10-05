@@ -24,8 +24,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
-from omics_graph_learning.config_handlers import ExperimentConfig
-from omics_graph_learning.config_handlers import TissueConfig
 import pandas as pd
 import psutil  # type: ignore
 from pybedtools import BedTool  # type: ignore
@@ -35,6 +33,9 @@ import seaborn as sns  # type: ignore
 import torch
 from torch_geometric.data import Data  # type: ignore
 import yaml  # type: ignore
+
+from omics_graph_learning.config_handlers import ExperimentConfig
+from omics_graph_learning.config_handlers import TissueConfig
 
 
 # decorator to track execution time
@@ -707,3 +708,9 @@ def gene_list_from_graphs(root_dir: str, tissue: str) -> List[str]:
     not have edges in smaller window"""
     directory = f"{root_dir}/{tissue}/parsing/graphs"
     return [gene.split("_")[0] for gene in os.listdir(directory)]
+
+
+# optuna utils
+def custom_sort_pearson(val: float) -> float:
+    """Custom sort to move inf values to bottom."""
+    return -float("inf") if np.isinf(val) else val
