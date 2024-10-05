@@ -1,0 +1,80 @@
+---
+dirs:
+  root_dir: /ocean/projects/bio210019p/stevesho/data/preprocess
+
+features:
+  ATAC: ATAC-seq_merged.narrow.peaks.hg38.bed
+  CTCF: CTCF_merged.narrow.peaks.hg38.bed
+  DNase: DNase-seq_merged.narrow.peaks.hg38.bed
+  H3K27ac: H3K27ac_merged.narrow.peaks.hg38.bed
+  H3K27me3: H3K27me3_merged.narrow.peaks.hg38.bed
+  H3K36me3: H3K36me3_merged.narrow.peaks.hg38.bed
+  H3K4me1: H3K4me1_merged.narrow.peaks.hg38.bed
+  H3K4me2: H3K4me2_merged.narrow.peaks.hg38.bed
+  H3K4me3: H3K4me3_merged.narrow.peaks.hg38.bed
+  H3K79me2: H3K79me2_merged.narrow.peaks.hg38.bed
+  H3K9ac: H3K9ac_merged.narrow.peaks.hg38.bed
+  H3K9me3: H3K9me3_merged.narrow.peaks.hg38.bed
+  POLR2A: POLR2A_merged.narrow.peaks.hg38.bed
+  RAD21: RAD21_merged.narrow.peaks.hg38.bed
+  SMC3: SMC3_merged.narrow.peaks.hg38.bed
+
+interaction:
+  gct: GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct
+  gencode: gencode_v26_genes_only_with_GTEx_targets.bed
+  id_lookup: gencode_to_genesymbol_lookup_table.txt
+  mirdip: null
+  mirnatargets: null
+  tf_marker: null
+
+local:
+  cnv: cnv_hg38.bed
+  cpgislands: cpgislands_hg38.bed
+  ctcfccre: ctcfccre_parsed_hg38.bed
+  gencode: gencode_v26_genes_only_with_GTEx_targets.bed
+  indels: indels_hg38.bed
+  line: line_hg38.bed
+  ltr: ltr_hg38.bed
+  microsatellites: microsatellites_hg38.bed
+  phastcons: phastcons_hg38.bed
+  polyasites: polyasites_filtered_hg38.bed
+  rbpsiteclusters: rbpsiteclusters_parsed_hg38.bed
+  recombination: recombination_hg38.bed
+  repg1b: repg1b_hg38.bed
+  repg2: repg2_hg38.bed
+  reps1: reps1_hg38.bed
+  reps2: reps2_hg38.bed
+  reps3: reps3_hg38.bed
+  reps4: reps4_hg38.bed
+  rnarepeat: rnarepeat_hg38.bed
+  simplerepeats: simplerepeats_hg38.bed
+  sine: sine_hg38.bed
+  snp: snp_hg38.bed
+  tss: tss_parsed_hg38.bed
+
+methylation:
+  cpg: E058_WGBS_FractionalMethylation.bigwig
+  cpg_filetype: roadmap
+  cpg_liftover: true
+
+resources:
+  blacklist: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38-blacklist.v2.bed
+  chromfile: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.chrom.sizes
+  fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
+  gencode_attr: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/gencode_v26_node_attr.bed
+  liftover: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/liftOver
+  liftover_chain: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg19ToHg38.over.chain.gz
+  reftss_genes: /ocean/projects/bio210019p/stevesho/resources/reftss_annotated.bed
+  se_ref: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/se_node_attr.bed
+  tf_motifs: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/collapsed_motifs_overlapping_consensus_footprints_hg38.bed
+  tpm: null
+  tissue: nhek
+  rna: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/tpm/ENCFF223GBX.tsv
+  marker_name: NHEK
+  ppi_tissue: NHEK
+
+tissue_specific_nodes:
+  crms: crms.bed
+  super_enhancer: SE_02_0216_SE_hg38.bed
+  tads: NHEK_Rao_2014-raw_TADs.txt
+  tf_binding: interval.all.fps.0.0001.bed

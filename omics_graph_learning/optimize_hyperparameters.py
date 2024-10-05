@@ -49,8 +49,8 @@ from omics_graph_learning.utils.common import tensor_out_to_array
 
 # helpers for trial
 EPOCHS = 20
-MIN_RESOURCE = 4
-REDUCTION_FACTOR = 3
+MIN_RESOURCE = 10
+REDUCTION_FACTOR = 4
 PATIENCE = 6
 
 
@@ -124,7 +124,7 @@ def suggest_hyperparameters(
 
     train_params = {
         "learning_rate": trial.suggest_float(
-            "learning_rate", low=5e-5, high=5e-2, log=True
+            "learning_rate", low=5e-5, high=1e-2, log=True
         ),
         "optimizer_type": trial.suggest_categorical(
             "optimizer_type", ["Adam", "AdamW"]
@@ -426,16 +426,23 @@ def run_optimization(
     storage = JournalStorage(JournalFileBackend(str(storage_file)))
 
     # create the study
+    # study = optuna.create_study(
+    #     study_name=study_name,
+    #     storage=storage,
+    #     load_if_exists=True,
+    #     direction="minimize",
+    #     pruner=optuna.pruners.HyperbandPruner(
+    #         min_resource=MIN_RESOURCE,
+    #         max_resource=EPOCHS,
+    #         reduction_factor=REDUCTION_FACTOR,
+    #     ),
+    # )
     study = optuna.create_study(
         study_name=study_name,
         storage=storage,
         load_if_exists=True,
         direction="minimize",
-        pruner=optuna.pruners.HyperbandPruner(
-            min_resource=MIN_RESOURCE,
-            max_resource=EPOCHS,
-            reduction_factor=REDUCTION_FACTOR,
-        ),
+        pruner=optuna.pruners.MedianPruner(n_warmup_steps=5),
     )
     logger.info(f"Created new study: {study_name}")
 

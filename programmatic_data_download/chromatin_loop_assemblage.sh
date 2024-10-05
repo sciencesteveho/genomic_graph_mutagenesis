@@ -308,10 +308,11 @@ echo "Total time: $(convertsecs SECONDS)"
 # =============================================================================
 # code for combining callers - happens after running initial models
 # =============================================================================
-# combine loop callers
-# declare -a tissues=(
-#     "adrenal" "aorta" "gm12878" "h1_esc" "hepg2" "hippocampus" "hmec" "imr90" "k562" "left_ventricle" "liver" "lung" "nhek" "ovary" "pancreas" "skeletal_muscle" "small_intestine" "spleen"
-# )
-combine_loop_callers k562 300000
-combine_hic k562 300000 0.001
-combine_all k562
+declare -a tissues=(
+    "adrenal" "aorta" "gm12878" "h1_esc" "hepg2" "hippocampus" "hmec" "imr90" "k562" "left_ventricle" "liver" "lung" "nhek" "ovary" "pancreas" "skeletal_muscle" "small_intestine" "spleen"
+)
+for tissue in "${tissues[@]}"; do
+    combine_loop_callers "$tissue" 300000
+    combine_hic "$tissue" 300000 0.001
+    combine_all "$tissue"
+done
