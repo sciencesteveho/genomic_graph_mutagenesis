@@ -248,7 +248,7 @@ class PipelineRunner:
         )
 
         if args.heads:
-            train_args += f" --heads {args.heads}"
+            train_args += f" --heads {args.heads} "
 
         with contextlib.suppress(AttributeError):
             if args.total_random_edges:
