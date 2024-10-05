@@ -72,9 +72,10 @@ def plot_predicted_versus_expected(
     sns.regplot(
         x=expected,
         y=predicted,
-        scatter_kws={"s": 2, "alpha": 0.1},
+        scatter_kws={"s": 1.5, "alpha": 1},
         ax=ax,
         line_kws={"color": "#D3D3D3"},
+        fit_reg=False,
     )
     ax.margins(x=0)
     ax.set_xlabel("Expected Log2 TPM", fontsize=7)
