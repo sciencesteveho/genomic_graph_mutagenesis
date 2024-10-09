@@ -102,9 +102,9 @@ def plot_predicted_versus_expected(
     plot.ax_joint.set_xlabel("Expected Log2 Expression")
     plot.ax_joint.set_ylabel("Predicted Log2 Expression")
     plot.figure.suptitle(
-        "Expected versus predicted TPM\n"
-        f"Spearman's R: {spearman_r:.4f}\n"
-        f"RMSE: {rmse:.4f}",
+        r"Expected versus predicted TPM\n"
+        r"Spearman's $\rho$: {:.4f}\n"
+        r"RMSE: {:.4f}".format(spearman_r, rmse),
         y=0.95,
     )
 
@@ -148,4 +148,5 @@ def plot_predicted_versus_expected(
         verticalalignment="top",
     )
     plot.tight_layout()
+    plot.savefig(save_path / "performance.png", dpi=300, bbox_inches="tight")
     return plot
