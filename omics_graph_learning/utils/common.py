@@ -471,6 +471,11 @@ def save_error_state(
     torch.save(state, f"error_state_{model.name}.pt")
 
 
+def count_model_parameters(model: torch.nn.Module) -> int:
+    """Count the number of trainable parameters in a model."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
 # genome data utils
 class ScalerUtils:
     """Utility class for scaling node features, as the modules for scaling share

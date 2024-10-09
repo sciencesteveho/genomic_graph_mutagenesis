@@ -33,6 +33,7 @@ from omics_graph_learning.graph_to_pytorch import GraphToPytorch
 from omics_graph_learning.perturb_graph import PerturbationConfig
 from omics_graph_learning.schedulers import OptimizerSchedulerHandler
 from omics_graph_learning.utils.arg_parser import OGLCLIParser
+from omics_graph_learning.utils.common import count_model_parameters
 from omics_graph_learning.utils.common import dir_check_make
 from omics_graph_learning.utils.common import PyGDataChecker
 from omics_graph_learning.utils.common import setup_logging
@@ -681,12 +682,16 @@ def post_model_evaluation(
 
 
 def _dump_metadata_json(
-    args: argparse.Namespace, experiment_config: ExperimentConfig, run_dir: Path
+    args: argparse.Namespace,
+    experiment_config: ExperimentConfig,
+    run_dir: Path,
+    total_parameters: int,
 ) -> None:
     """Dump metadata json to run directory."""
     metadata = vars(args)
     metadata["experiment_name"] = experiment_config.experiment_name
     metadata["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    metadata["total_parameters"] = total_parameters
     with open(run_dir / "metadata.json", "w") as output:
         json.dump(metadata, output, indent=4)
 
@@ -708,13 +713,6 @@ def _experiment_setup(
     # set up loggers
     logger = setup_logging(log_file=str(run_dir / "logs" / "training_log.txt"))
     tb_logger = TensorBoardLogger(log_dir=tb_dir / f"run_{args.run_number}")
-
-    # dump metadata to run directory
-    _dump_metadata_json(
-        args=args,
-        experiment_config=experiment_config,
-        run_dir=run_dir,
-    )
 
     logger.info("Experiment setup initialized.")
     logger.info(f"Experiment configuration: {experiment_config}")
@@ -819,11 +817,17 @@ def main() -> None:
     )
     model = model.to(device)
 
-    # log model graph to tensorboard
+    # log model graph to tensorboard and json
     tb_logger.log_model_graph(
         model=model,
         device=device,
         feature_size=data.x.shape[1],
+    )
+    _dump_metadata_json(
+        args=args,
+        experiment_config=experiment_config,
+        run_dir=run_dir,
+        total_parameters=count_model_parameters(model),
     )
 
     # set up optimizer & scheduler
