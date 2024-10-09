@@ -136,6 +136,22 @@ def _get_files_in_directory(dir: Path) -> List[str]:
     return [file for file in os.listdir(dir) if os.path.isfile(os.path.join(dir, file))]
 
 
+def _add_hash_if_missing(file: str) -> None:
+    """Add a hash to the first line of a file if it is missing. This is for
+    reading in a file as a bedfile to pybedtools.
+    """
+    with open(file, "r") as f:
+        lines = f.readlines()
+
+    # add hash if missing
+    if not lines[0].startswith("#"):
+        lines[0] = "#" + lines[0]
+
+    # write back to file
+    with open(file, "w") as f:
+        f.writelines(lines)
+
+
 # data loading and saving
 def _load_pickle(file_path: Union[str, Path]) -> Any:
     """Wrapper to load a pkl"""

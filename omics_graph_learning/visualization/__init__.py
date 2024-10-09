@@ -13,6 +13,7 @@ def set_matplotlib_publication_parameters() -> None:
             "xtick.labelsize": 7,
             "ytick.labelsize": 7,
             "legend.fontsize": 7,
+            "figure.titlesize": 7,
             "figure.dpi": 300,
             "font.sans-serif": "Nimbus Sans",
         }

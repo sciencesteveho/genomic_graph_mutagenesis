@@ -74,7 +74,6 @@ def plot_contact_size_distribution(
 ) -> None:
     """Plot distribution of chromatin contact sizes."""
     set_matplotlib_publication_parameters()
-    plt.figure(figsize=(3, 2.5))
     sns.histplot(data=df, x="size", bins=200, kde=True)
     plt.xlim(0, max_size)
     plt.xlabel("Contact Size (bp)")

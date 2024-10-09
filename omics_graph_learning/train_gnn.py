@@ -578,6 +578,7 @@ def make_model_plots(
     labels: torch.Tensor,
     rmse: float,
     tb_logger: TensorBoardLogger,
+    run_dir: Path,
 ) -> None:
     """Plot training losses and performance"""
     # convert to numpy arrays
@@ -589,6 +590,7 @@ def make_model_plots(
         predicted=predictions_median,
         expected=labels_median,
         rmse=rmse,
+        savepath=run_dir,
     )
     tb_logger.writer.add_figure("Model performance", performance)
 
@@ -674,6 +676,7 @@ def post_model_evaluation(
         labels=labels,
         rmse=rmse,
         tb_logger=tb_logger,
+        run_dir=run_dir,
     )
 
 
