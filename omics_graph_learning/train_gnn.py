@@ -591,7 +591,7 @@ def make_model_plots(
         predicted=predictions_median,
         expected=labels_median,
         rmse=rmse,
-        savepath=run_dir,
+        save_path=run_dir,
     )
     tb_logger.writer.add_figure("Model performance", performance)
 
