@@ -19,7 +19,6 @@ import seaborn as sns  # type: ignore
 from tensorboard.backend.event_processing.event_accumulator import (
     EventAccumulator,
 )  # type: ignore
-import torch
 
 from omics_graph_learning.visualization import set_matplotlib_publication_parameters
 
@@ -67,7 +66,7 @@ def plot_predicted_versus_expected(
     expected: np.ndarray,
     rmse: float,
     save_path: Union[str, Path] = None,
-) -> sns.JointGrid:
+) -> Figure:
     """Plots predicted versus expected values for a given model"""
     set_matplotlib_publication_parameters()
 
@@ -102,9 +101,9 @@ def plot_predicted_versus_expected(
     plot.ax_joint.set_xlabel("Expected Log2 Expression")
     plot.ax_joint.set_ylabel("Predicted Log2 Expression")
     plot.figure.suptitle(
-        r"Expected versus predicted TPM\n"
-        r"Spearman's $\rho$: {:.4f}\n"
-        r"RMSE: {:.4f}".format(spearman_r, rmse),
+        f"Expected versus predicted TPM\n"
+        rf"Spearman's $\rho$: {spearman_r:.4f}\n"
+        f"RMSE: {rmse:.4f}",
         y=0.95,
     )
 
@@ -149,4 +148,4 @@ def plot_predicted_versus_expected(
     )
     plt.tight_layout()
     plot.savefig(save_path / "performance.png", dpi=300, bbox_inches="tight")
-    return plot
+    return plot.figure
