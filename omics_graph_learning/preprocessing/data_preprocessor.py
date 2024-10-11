@@ -420,6 +420,11 @@ class GenomeDataPreprocessor:
             if "tads" in self.nodes:
                 self._add_tad_id(self.tissue_specific_nodes["tads"])
             if "loops" in self.nodes:
+                check_and_symlink(
+                    src=self.tissue_specific_nodes["loops"],
+                    dst=self.tissue_dir / "local" / f"loops_{self.tissue}.bed",
+                )
+            if "loops" in self.nodes:
                 self._add_loop_id(self.loops)
             if "superenhancers" in self.nodes:
                 self._superenhancers(self.tissue_specific_nodes["super_enhancer"])

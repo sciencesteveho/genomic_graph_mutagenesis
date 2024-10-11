@@ -7,7 +7,7 @@ attribute_references:
   super_enhancers: se_node_attr.bed
   tf_motifs: collapsed_motifs_overlapping_consensus_footprints_hg38.bed
 
-baseloops: allcontacts
+baseloops: allloopshicfdr
 
 blacklist: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38-blacklist.v2.bed
 
@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: regulatory_only_cell_lines_allcontacts
+experiment_name: regulatory_only_all_celllines_alloopshicfdr
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 

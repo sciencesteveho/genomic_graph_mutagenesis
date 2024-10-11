@@ -184,6 +184,47 @@ combine_all() {
 
 
 # =============================================================================
+# Combine all loop callers with hi-c at fdr 0.001
+# Args:
+#   1 - tissue name
+# Output:
+#   All contacts combined and saved to 'allloopshic' directory
+# =============================================================================
+combine_alloopshicfdr() {
+    local tissue="$1"
+    local loop_file="combinedloopcallers/${tissue}_loops.bedpe"
+    local hic_file="fdr_filtered_hic/0.001/${tissue}_contacts.bedpe"
+    local output_dir="allloopshicfdr"
+    local output_file="${output_dir}/${tissue}_contacts.bedpe"
+    mkdir -p "$output_dir"
+
+    # verify the separate inputs
+    if [ -z "$tissue" ]; then
+        echo "Usage: combine_all <tissue_or_cell_line>"
+        return 1
+    fi
+
+    if [ ! -f "$loop_file" ]; then
+        echo "Error: Combined loop file '$loop_file' does not exist. Please run combine_loop_callers first."
+        return 1
+    fi
+
+    if [ ! -f "$hic_file" ]; then
+        echo "Error: Combined HIC file '$hic_file' does not exist. Please run combine_hic first."
+        return 1
+    fi
+
+    # cat, sort, dedupe
+    cat "$loop_file" "$hic_file" \
+        | sort -k1,1 -k2,2n -k3,3n \
+        | cut -f1-6 \
+        | uniq > "$output_file"
+
+    echo "All combined data for '$tissue' saved to '$output_file'"
+}
+
+
+# =============================================================================
 # Main function to perform centralized processing
 # =============================================================================
 function _main () {
@@ -312,7 +353,8 @@ declare -a tissues=(
     "adrenal" "aorta" "gm12878" "h1_esc" "hepg2" "hippocampus" "hmec" "imr90" "k562" "left_ventricle" "liver" "lung" "nhek" "ovary" "pancreas" "skeletal_muscle" "small_intestine" "spleen"
 )
 for tissue in "${tissues[@]}"; do
-    combine_loop_callers "$tissue" 300000
-    combine_hic "$tissue" 300000 0.001
-    combine_all "$tissue"
+    # combine_loop_callers "$tissue" 300000
+    # combine_hic "$tissue" 300000 0.001
+    # combine_all "$tissue"
+    combine_alloopshicfdr "$tissue"
 done

@@ -14,257 +14,293 @@ import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
 import pandas as pd
 import pingouin as pg  # type: ignore
+from scipy.stats import f_oneway  # type: ignore
 from scipy.stats import ttest_rel  # type: ignore
 from scipy.stats import wilcoxon  # type: ignore
 from statsmodels.stats.anova import AnovaRM  # type: ignore
+from statsmodels.stats.multicomp import pairwise_tukeyhsd  # type: ignore
 
 
 class ModelMetrics:
-    """Class to store model performance metrics, and compute the mean and
-    standard deviation across the three seeded runs.
+    """
+    Class to store model performance metrics and compute statistics across runs.
 
     Attributes:
         model_dir: Path to the model directory.
-        metrics: Dictionary of performance metrics for each run.
-
-    Methods
-    --------
-    print_results:
-        Print the computed statistics for the model.
-
-    Examples:
-    --------
-    # Instantiating the object will automatically call metrics calculation
-    >>> model_metrics = ModelMetrics(Path("path/to/model_dir"))
-
-    # Print the computed statistics to the console
-    >>> model_metrics.print_results()
+        per_run_df: DataFrame containing metrics for each run.
+        summary_df: DataFrame containing mean and std for each metric.
     """
 
-    def __init__(self, model_dir: Path):
+    def __init__(self, model_dir: Union[Path, str]) -> None:
+        """Initialize the ModelMetrics object."""
+        if isinstance(model_dir, str):
+            model_dir = Path(model_dir)
         self.model_dir = model_dir
 
-        # compute statistics
-        self.metrics = self._load_precomputed_metrics()
-        self._compute_statistics()
+        # Collect metrics from all runs
+        self.per_run_df = self._load_metrics()
 
-    def _load_precomputed_metrics(self) -> Dict[str, List[float]]:
-        """Load precomputed bootstrap confidence intervals and final test set
-        RMSE from model post evaluation.
-        """
-        metrics: Dict[str, List[float]] = {
-            "ci_lower": [],
-            "ci_upper": [],
-            "final_test_pearson": [],
-            "final_test_rmse": [],
-            "bootstrap_pearson": [],
-        }
+        # Compute summary statistics
+        self.summary_df = self._compute_summary()
+
+    def _load_metrics(self) -> pd.DataFrame:
+        """Load metrics from model evaluation for all runs."""
+        metrics = []
 
         for run_number in range(1, 4):
             metrics_file = self.model_dir / f"run_{run_number}" / "eval_metrics.json"
             if metrics_file.exists():
                 with open(metrics_file, "r") as f:
                     metrics_json = json.load(f)
-                    metrics["ci_lower"].append(metrics_json.get("CI lower", np.nan))
-                    metrics["ci_upper"].append(metrics_json.get("CI upper", np.nan))
-                    metrics["final_test_pearson"].append(
-                        metrics_json.get("Final test pearson", np.nan)
-                    )
-                    metrics["final_test_rmse"].append(
-                        metrics_json.get("Final test RMSE", np.nan)
-                    )
-                    metrics["bootstrap_pearson"].append(
-                        metrics_json.get("Bootstrap pearson", np.nan)
+                    metrics.append(
+                        {
+                            "Model": self.model_dir.name,
+                            "Run": run_number,
+                            "CI_Lower": metrics_json.get("CI lower", np.nan),
+                            "CI_Upper": metrics_json.get("CI upper", np.nan),
+                            "Final_Test_Pearson": metrics_json.get(
+                                "Final test pearson", np.nan
+                            ),
+                            "Final_Test_RMSE": metrics_json.get(
+                                "Final test RMSE", np.nan
+                            ),
+                            "Bootstrap_Pearson": metrics_json.get(
+                                "Bootstrap pearson", np.nan
+                            ),
+                        }
                     )
             else:
-                print(f"CI file not found: {metrics_file}")
+                print(f"Metrics file not found: {metrics_file}")
 
-        return metrics
+        if not metrics:
+            # If no metrics were loaded, return a DataFrame with NaNs
+            return pd.DataFrame(
+                {
+                    "Model": [self.model_dir.name],
+                    "Run": [np.nan],
+                    "CI_Lower": [np.nan],
+                    "CI_Upper": [np.nan],
+                    "Final_Test_Pearson": [np.nan],
+                    "Final_Test_RMSE": [np.nan],
+                    "Bootstrap_Pearson": [np.nan],
+                }
+            )
 
-    def _compute_statistics(self) -> None:
-        """Compute means and standard deviations of the performance metrics
-        from all runs.
-        """
-        metrics_to_compute = {
-            "final_test_rmse": "final_test_rmse",
-            "final_test_pearson": "final_test_pearson",
-            "bootstrap_pearson": "bootstrap_pearson",
-            "ci_lower": "ci_lower",
-            "ci_upper": "ci_upper",
+        # Create DataFrame from the list of metrics
+        return pd.DataFrame(metrics)
+
+    def _compute_summary(self) -> pd.DataFrame:
+        """Compute mean and std for each metric."""
+        mean_metrics = self.per_run_df.mean(numeric_only=True)
+        std_metrics = self.per_run_df.std(numeric_only=True, ddof=1)
+
+        summary_data = {
+            "Model": self.model_dir.name,
+            "Final_Test_Pearson_Mean": mean_metrics.get("Final_Test_Pearson", np.nan),
+            "Final_Test_Pearson_Std": std_metrics.get("Final_Test_Pearson", np.nan),
+            "Final_Test_RMSE_Mean": mean_metrics.get("Final_Test_RMSE", np.nan),
+            "Final_Test_RMSE_Std": std_metrics.get("Final_Test_RMSE", np.nan),
+            "CI_Lower_Mean": mean_metrics.get("CI_Lower", np.nan),
+            "CI_Lower_Std": std_metrics.get("CI_Lower", np.nan),
+            "CI_Upper_Mean": mean_metrics.get("CI_Upper", np.nan),
+            "CI_Upper_Std": std_metrics.get("CI_Upper", np.nan),
+            "Bootstrap_Pearson_Mean": mean_metrics.get("Bootstrap_Pearson", np.nan),
+            "Bootstrap_Pearson_Std": std_metrics.get("Bootstrap_Pearson", np.nan),
         }
 
-        for metric_key, metric_name in metrics_to_compute.items():
-            setattr(self, f"{metric_name}_mean", np.mean(self.metrics[metric_key]))
-            setattr(
-                self, f"{metric_name}_std", np.std(self.metrics[metric_key], ddof=1)
-            )
+        return pd.DataFrame([summary_data])
+
+    def get_per_run_df(self) -> pd.DataFrame:
+        """Return the DataFrame containing metrics for each run."""
+        return self.per_run_df
+
+    def get_summary_df(self) -> pd.DataFrame:
+        """Return the DataFrame containing the mean and std for the model."""
+        return self.summary_df
 
     def print_results(self) -> None:
         """Print the computed statistics for the model."""
-        metrics_to_print = [
-            "final_test_pearson_mean",
-            "final_test_rmse_mean",
-            "final_test_rmse_std",
-            "bootstrap_pearson_mean",
-            "bootstrap_pearson_std",
-            "ci_lower_mean",
-            "ci_upper_mean",
-        ]
-        for metric in metrics_to_print:
-            print(f"{metric}: {getattr(self, metric)}")
+        print(f"Model: {self.summary_df['Model'].iloc[0]}")
+        print("Mean Metrics:")
+        print(
+            self.summary_df.iloc[0][
+                [
+                    "Final_Test_Pearson_Mean",
+                    "Final_Test_RMSE_Mean",
+                    "CI_Lower_Mean",
+                    "CI_Upper_Mean",
+                    "Bootstrap_Pearson_Mean",
+                ]
+            ]
+        )
+        print("\nStandard Deviation Metrics:")
+        print(
+            self.summary_df.iloc[0][
+                [
+                    "Final_Test_Pearson_Std",
+                    "Final_Test_RMSE_Std",
+                    "CI_Lower_Std",
+                    "CI_Upper_Std",
+                    "Bootstrap_Pearson_Std",
+                ]
+            ]
+        )
 
 
 class ModelComparison:
-    """Class to compare model performances and perform statistical analyses.
+    """
+    Class to compare model performances using statistical tests.
 
     Attributes:
-        collected_metrics: List of ModelMetrics objects to compare.
-        model_names: List of model names.
-        performances: Dictionary of model performances.
-        p_values_ttest: Pairwise p-values from paired t-tests.
-        p_values_wilcoxon: Pairwise p-values from Wilcoxon signed-rank tests.
-        effect_sizes: Pairwise Cohen's d effect sizes.
-        anova_results: Repeated measures ANOVA results.
-        posthoc_results: Post-hoc pairwise t-test results.
-
-    Methods
-    --------
-    compare_models:
-        Perform statistical tests and print results.
-    report_results:
-        Print model comparison results.
-
-    Examples:
-    --------
-    # Instantiate the ModelComparison object with a list of ModelMetrics objects
-    >>> model_comparison = ModelComparison([model_metrics_1, model_metrics_2])
-
-    # Compare models and print results
-    >>> model_comparison.compare_models()
-
-    # Print results again
-    >>> model_comparison.report_results()
+        combined_metrics_df: DataFrame containing per-run metrics for all models.
+        summary_df: DataFrame containing mean and std for each model.
     """
 
-    def __init__(self, collected_metrics: List[ModelMetrics]) -> None:
-        """Initialize the ModelComparison class with a list of ModelMetrics
-        objects to compare.
+    def __init__(
+        self, combined_metrics_df: pd.DataFrame, summary_df: pd.DataFrame
+    ) -> None:
         """
-        self.collected_metrics = collected_metrics
-        self.model_names = [mm.model_dir.name for mm in collected_metrics]
+        Initialize the ModelComparison class.
 
-        if len(self.model_names) < 2:
-            raise ValueError(
-                "Need at least two ModelMetrics objects to compare performance."
-            )
-
-        # collect performances
-        self.performances = {
-            mm.model_dir.name: mm.metrics["final_test_pearson_mean"]
-            for mm in collected_metrics
-        }
-
-    def compare_models(self) -> None:
-        """Perform statistical tests and print results."""
-        self._statistical_tests()
-        self.report_results()
-
-    def _statistical_tests(self) -> None:
-        """Perform paired t-tests, Wilcoxon tests, calculate effect sizes, and
-        repeated measures ANOVA on the test-set Pearson R.
+        Args:
+            combined_metrics_df: DataFrame with per-run metrics for all models.
+            summary_df: DataFrame with summary statistics for each model.
         """
-        models = self.model_names
-        n_models = len(models)
-        self.p_values_ttest = np.full((n_models, n_models), np.nan)
-        self.p_values_wilcoxon = np.full((n_models, n_models), np.nan)
-        self.effect_sizes = np.full((n_models, n_models), np.nan)
+        self.combined_metrics_df = combined_metrics_df
+        self.summary_df = summary_df
 
-        for i in range(n_models):
-            for j in range(i + 1, n_models):
-                model_i = models[i]
-                model_j = models[j]
-                data_i = np.array(self.performances[model_i])
-                data_j = np.array(self.performances[model_j])
+    def perform_anova(self) -> float:
+        """
+        Perform one-way ANOVA to test if there are any statistically significant differences between the means of the models.
 
-                # paired t-test
-                _, p_val_ttest = ttest_rel(data_i, data_j)
-                self.p_values_ttest[i, j] = p_val_ttest
-                self.p_values_ttest[j, i] = p_val_ttest  # symmetric
-
-                # wilcoxon signed-rank test
-                try:
-                    _, p_val_wilcoxon = wilcoxon(data_i, data_j)
-                except ValueError:
-                    # handle the case where all differences are zero
-                    p_val_wilcoxon = 1.0
-                self.p_values_wilcoxon[i, j] = p_val_wilcoxon
-                self.p_values_wilcoxon[j, i] = p_val_wilcoxon  # symmetric
-
-                # Cohen's d - effect size
-                cohen_d = self._cohens_d(data_i, data_j)
-                self.effect_sizes[i, j] = cohen_d
-                self.effect_sizes[j, i] = cohen_d  # symmetric
-
-        # repeated measures ANOVA
-        if n_models > 2:
-            self._repeated_measures_anova()
-        else:
-            self.anova_results = None
-            self.posthoc_results = None
-
-    def _cohens_d(self, x: np.ndarray, y: np.ndarray) -> float:
-        """Compute Cohen's d for paired samples."""
-        diff = x - y
-        sd_diff = np.std(diff, ddof=1)
-        mean_diff = np.mean(diff)
-        return mean_diff / sd_diff if sd_diff != 0 else 0.0
-
-    def _repeated_measures_anova(self) -> None:
-        """Perform repeated measures ANOVA and post-hoc tests."""
-        subjects = np.arange(len(next(iter(self.performances.values()))))
-        data: List[Dict[str, Union[str, float]]] = []
-        for model in self.model_names:
-            data.extend(
-                {"Subject": subjects[i], "Model": model, "Performance": perf}
-                for i, perf in enumerate(self.performances[model])
-            )
-        df = pd.DataFrame(data)
-        aovrm = AnovaRM(df, "Performance", "Subject", within=["Model"])
-        res = aovrm.fit()
-        self.anova_results = res
-
-        # check if ANOVA shows significant differences
-        p_value = res.anova_table["Pr > F"][0]
-        if p_value < 0.05:
-            # post-hoc pairwise t-tests with Holm correction
-            self.posthoc_results = pg.pairwise_ttests(
-                dv="Performance",
-                within="Model",
-                subject="Subject",
-                data=df,
-                padjust="holm",
-            )
-        else:
-            self.posthoc_results = None
-
-    def report_results(self) -> None:
-        """Print model comparison results."""
-        print("Model Performance Metrics:")
-        metrics_to_print = [
-            "p_values_ttest",
-            "p_values_wilcoxon",
-            "effect_sizes",
-            "anova_results",
-            "posthoc_results",
+        Returns:
+            p-value from the ANOVA test.
+        """
+        # Extract the data for ANOVA
+        groups = [
+            group["Final_Test_Pearson"].values
+            for name, group in self.combined_metrics_df.groupby("Model")
         ]
 
-        for metric in metrics_to_print:
-            if getattr(self, metric) is not None:
-                print(f"{metric}: {getattr(self, metric)}")
-            else:
-                print(f"{metric}: not calculated.")
+        # Perform one-way ANOVA
+        f_stat, p_val = f_oneway(*groups)
+        print(
+            f"One-Way ANOVA Results: F-statistic = {f_stat:.4f}, p-value = {p_val:.4f}"
+        )
+        return p_val
 
-        if self.anova_results is None:
-            print(
-                "\nANOVA was not performed (less than 3 models) or did not show significant differences."
-            )
+    def perform_posthoc_ttests(self, alpha: float = 0.05) -> pd.DataFrame:
+        """
+        Perform post-hoc pairwise t-tests with Bonferroni correction.
+
+        Args:
+            alpha: Significance level.
+
+        Returns:
+            DataFrame containing pairwise comparisons and their adjusted p-values.
+        """
+        models = self.combined_metrics_df["Model"].unique()
+        results = []
+
+        num_comparisons = len(models) * (len(models) - 1) / 2
+        bonferroni_alpha = alpha / num_comparisons
+
+        for i in range(len(models)):
+            for j in range(i + 1, len(models)):
+                model_i = models[i]
+                model_j = models[j]
+
+                data_i = self.combined_metrics_df[
+                    self.combined_metrics_df["Model"] == model_i
+                ]["Final_Test_Pearson"]
+                data_j = self.combined_metrics_df[
+                    self.combined_metrics_df["Model"] == model_j
+                ]["Final_Test_Pearson"]
+
+                # Ensure paired data if applicable; otherwise, use independent t-test
+                # Here, runs are independent between models
+                t_stat, p_val = ttest_rel(data_i, data_j)
+
+                # Apply Bonferroni correction
+                adjusted_p_val = p_val * num_comparisons
+                adjusted_p_val = min(adjusted_p_val, 1.0)
+
+                results.append(
+                    {
+                        "Model 1": model_i,
+                        "Model 2": model_j,
+                        "t-statistic": t_stat,
+                        "p-value": p_val,
+                        "Adjusted p-value (Bonferroni)": adjusted_p_val,
+                    }
+                )
+
+        results_df = pd.DataFrame(results)
+        print("\nPost-Hoc Pairwise T-Test Results with Bonferroni Correction:")
+        print(results_df)
+
+        # Save to CSV
+        results_df.to_csv("posthoc_pairwise_ttest_results.csv", index=False)
+
+        return results_df
+
+    def visualize_pvalues(self, posthoc_df: pd.DataFrame) -> None:
+        """
+        Visualize the adjusted p-values as a heatmap.
+
+        Args:
+            posthoc_df: DataFrame containing post-hoc test results.
+        """
+        # Create a pivot table for heatmap
+        pivot_df = posthoc_df.pivot(
+            index="Model 1", columns="Model 2", values="Adjusted p-value (Bonferroni)"
+        )
+
+        # Initialize a square DataFrame for symmetric heatmap
+        models = self.combined_metrics_df["Model"].unique()
+        heatmap_df = pd.DataFrame(np.nan, index=models, columns=models)
+
+        for _, row in posthoc_df.iterrows():
+            heatmap_df.loc[row["Model 1"], row["Model 2"]] = row[
+                "Adjusted p-value (Bonferroni)"
+            ]
+            heatmap_df.loc[row["Model 2"], row["Model 1"]] = row[
+                "Adjusted p-value (Bonferroni)"
+            ]
+
+        # # Set diagonal to NaN
+        # np.fill_diagonal(heatmap_df.values, np.nan)
+
+        # plt.figure(figsize=(12, 10))
+        # sns.heatmap(heatmap_df, annot=True, fmt=".3f", cmap="coolwarm", vmin=0, vmax=1)
+        # plt.title("Post-Hoc Pairwise T-Test Adjusted p-values (Bonferroni Correction)")
+        # plt.xticks(rotation=90)
+        # plt.yticks(rotation=0)
+        # plt.tight_layout()
+        # plt.savefig("posthoc_pvalues_heatmap.png")
+        # plt.close()
+
+        # print("\nPost-hoc p-values heatmap saved as 'posthoc_pvalues_heatmap.png'.")
+
+    # def plot_performance(self) -> None:
+    #     """
+    #     Plot the mean Final Test Pearson correlation with error bars representing the standard deviation.
+    #     """
+    #     plt.figure(figsize=(12, 8))
+    #     sns.barplot(
+    #         x="Final_Test_Pearson_Mean",
+    #         y="Model",
+    #         data=self.summary_df,
+    #         xerr=self.summary_df["Final_Test_Pearson_Std"],
+    #         palette="viridis",
+    #     )
+    #     plt.xlabel("Final Test Pearson Mean")
+    #     plt.ylabel("Model")
+    #     plt.title("Model Performance Comparison")
+    #     plt.tight_layout()
+    #     plt.savefig("model_performance_comparison.png")
+    #     plt.show()
+
+    #     print(
+    #         "\nModel performance comparison plot saved as 'model_performance_comparison.png'."
+    #     )

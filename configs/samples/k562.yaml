@@ -78,3 +78,4 @@ tissue_specific_nodes:
   super_enhancer: SE_01_0039_SE_hg38.bed
   tads: K562_Rao_2014-raw_TADs.txt
   tf_binding: interval.all.fps.0.0001.bed
+  loops: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/processed_loops/combinedloopcaller/k562_loops.bedpe
