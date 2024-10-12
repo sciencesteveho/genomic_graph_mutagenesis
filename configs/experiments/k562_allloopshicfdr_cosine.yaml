@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: regulatory_only_k562_allloopshicfdr
+experiment_name: regulatory_only_k562_allloopshicfdr_cosine
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 

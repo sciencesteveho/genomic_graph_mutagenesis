@@ -306,16 +306,14 @@ class GenomeDataPreprocessor:
         self._run_cmd(cmd)
 
     @time_decorator(print_args=True)
-    def _bigwig_to_filtered_bedgraph(
-        self, path: str, file: str, resource_dir: str
-    ) -> str:
+    def _bigwig_to_filtered_bedgraph(self, path: str, file: str) -> str:
         """Convert bigwig to bedgraph file"""
         bed = f"{path}/{file}"
-        convert_cmd = f"{resource_dir}/bigWigToBedGraph {bed}.bigwig {bed}.bedGraph"
+        convert_cmd = f"{self.experiment_config.reference_dir}/bigWigToBedGraph {bed}.bigwig {bed}.bedGraph"
         filter_cmd = f"awk '$4 >= 0.8' {bed}.bedGraph > {bed}_gt80.bedGraph"
         for cmd in [convert_cmd, filter_cmd]:
             self._run_cmd(cmd)
-        return f"{path}/{file}_gt80.bedGraph"
+        return f"{bed}_gt80.bedGraph"
 
     @time_decorator(print_args=True)
     def _merge_cpg(self, bed: Union[str, List[str]]) -> None:
@@ -336,7 +334,6 @@ class GenomeDataPreprocessor:
             cpg_bed = self._bigwig_to_filtered_bedgraph(
                 path=f"{self.tissue_dir}/unprocessed",
                 file=cpg_bed.split(".bigwig")[0],
-                resource_dir=self.resources["roadmap"],
             )
 
         if self.methylation["cpg_liftover"] == True:
