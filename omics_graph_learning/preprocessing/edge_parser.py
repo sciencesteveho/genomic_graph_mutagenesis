@@ -639,7 +639,7 @@ class EdgeParser:
 
     def _load_tss(self) -> BedTool:
         """Load TSS file and ignore any TSS that do not have a gene target.
-        Additionally, adds a slop of 1500kb to the TSS for downstream overlap.
+        Additionally, adds a slop of 2000kb to the TSS for downstream overlap.
         Ignores non-gene TSS by checking the length of the tss name:
         gene-associated tss are annotated with one extra field.
 
@@ -654,7 +654,7 @@ class EdgeParser:
             return None
 
         tss = BedTool(f"{self.tss}")
-        return self._add_slop_window(tss.filter(_gene_only_tss), 1500)
+        return self._add_slop_window(tss.filter(_gene_only_tss), 2000)
 
     def _process_overlaps(
         self, overlaps: List[Tuple[BedTool, BedTool, str]]
