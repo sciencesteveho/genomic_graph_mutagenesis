@@ -21,7 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import NeighborLoader  # type: ignore
-from torch_geometric.utils import connected_components  # type: ignore
+from torch_geometric.utils import k_hop_subgraph  # type: ignore
 from tqdm import tqdm  # type: ignore
 
 from omics_graph_learning.graph_to_pytorch import graph_to_pytorch
@@ -114,7 +114,7 @@ def load_crispri(
         )
 
     # load the file as a bedtool
-    _add_hash_if_missing(crispr_benchmarks)
+    # _add_hash_if_missing(crispr_benchmarks)
     links = pybedtools.BedTool(crispr_benchmarks).cut([0, 1, 2, 3, 8, 19])
 
     # intersect with enhancer catalogue, but only keep the enhancer, gene, and
@@ -124,15 +124,84 @@ def load_crispri(
     return {(f"{link[0]}_{link[1]}_enhancer", link[3], link[4]) for link in links}
 
 
+def filter_links_for_present_nodes(
+    graph: Data, links: List[Tuple[int, int, str]]
+) -> List[Tuple[int, int, str]]:
+    """Filter CRISPRi links to only include those with nodes present in the
+    graph.
+    """
+    num_nodes = graph.num_nodes
+
+    # convert links to tensors
+    links_tensor = torch.tensor([(tup[0], tup[1]) for tup in links], dtype=torch.long)
+
+    # check which links have both nodes in the valid range
+    valid_links_mask = (links_tensor[:, 0] < num_nodes) & (
+        links_tensor[:, 1] < num_nodes
+    )
+
+    # apply mask
+    valid_links_tensor = links_tensor[valid_links_mask]
+
+    # convert back to a list of tuples with the original third element
+    filtered_links = []
+    valid_idx = 0
+    for i, link in enumerate(links):
+        if valid_links_mask[i]:
+            filtered_links.append(
+                (
+                    int(valid_links_tensor[valid_idx][0]),
+                    int(valid_links_tensor[valid_idx][1]),
+                    link[2],
+                )
+            )
+            valid_idx += 1
+
+    return filtered_links
+
+
+def get_subgraph(data: Data, node_idx: int, num_hops: int) -> Data:
+    subset, edge_index, mapping, edge_mask = k_hop_subgraph(
+        node_idx,
+        num_hops,
+        data.edge_index,
+        relabel_nodes=True,
+        num_nodes=data.num_nodes,
+    )
+
+    subgraph = Data()
+    subgraph.edge_index = edge_index
+    subgraph.x = data.x[subset]
+
+    if hasattr(data, "edge_attr"):
+        subgraph.edge_attr = data.edge_attr[edge_mask]
+
+    return subgraph
+
+
 """
 crispr_benchmarks = "EPCrisprBenchmark_ensemble_data_GRCh38.tsv"
 enhancer_catalogue = "enhancers_epimap_screen_overlap.bed"
 crispri_links = load_crispri(crispr_benchmarks, enhancer_catalogue)
-with open("../regulatory_only_k562_allcontacts_unimp_full_graph_idxs.pkl", "rb") as f:
+with open('../regulatory_only_k562_combinedloopcallers_full_graph_idxs.pkl', 'rb') as f:
     idxs = pickle.load(f)
 gencode_lookup = load_gencode_lookup("gencode_to_genesymbol_lookup_table.txt")
 renamed_crispri_links = rename_tuples(crispri_links, idxs, gencode_lookup)
 renamed_crispri_links = {link for link in renamed_crispri_links if link is not None}
+crispri_links = filter_links_for_present_nodes(graph, renamed_crispri_links)
+
+Some for testing:
+ (487024, 11855, 'FALSE'),
+ (242639, 106, 'TRUE'),
+ (486837, 11855, 'FALSE'),
+ (665979, 4811, 'FALSE'),
+ (301526, 2864, 'FALSE'),
+ (486838, 716, 'FALSE'),
+ (90267, 17948, 'FALSE'),
+ (412026, 14109, 'TRUE'),
+ (320736, 10356, 'TRUE'),
+ 
+ 
 """
 
 # which analysis to perform?
@@ -149,11 +218,8 @@ renamed_crispri_links = {link for link in renamed_crispri_links if link is not N
 # we compare this to a random perturbation of the same size
 
 
-class ModelEvaluator:
-    """Class for evaluating the GNN model.
-
-    We
-    """
+class InSilicoPerturbation:
+    """Class to handle in silico perturbations."""
 
     def __init__(self, model: nn.Module, device: torch.device):
         """Initialize the ModelEvaluator.
@@ -175,7 +241,7 @@ class ModelEvaluator:
 
         Args:
             data (Data): The graph data of the connected component.
-            regression_mask (torch.Tensor): Mask indicating target nodes for
+            regression_mask (torch.Tensor): Mask indicating nodes for
             regression.
 
         Returns:
@@ -200,7 +266,7 @@ class ModelEvaluator:
 
 
 def perform_perturbation_analysis(
-    evaluator: ModelEvaluator,
+    evaluator: InSilicoPerturbation,
     subgraph: Data,
     gene_nodes: Set[int],
     cre_nodes: Set[int],
@@ -224,34 +290,27 @@ def perform_perturbation_analysis(
     # create a copy of the subgraph to avoid modifying the original
     perturbed_subgraph = subgraph.clone()
 
-    # remove edges associated with the perturbation targets
-    if perturbation_type in ("gene", "cre"):
-        # map perturbation targets to subgraph node indices
-        node_id_map = {
-            old_idx: new_idx
-            for new_idx, old_idx in enumerate(perturbed_subgraph.n_id.tolist())
-        }
-        perturbation_target_indices = [
-            node_id_map.get(target)
-            for target in perturbation_targets
-            if target in node_id_map
-        ]
-
-        if perturbation_target_indices:
-            # Identify edges to keep (edges not connected to perturbation targets)
-            edge_index = perturbed_subgraph.edge_index
-            mask = ~(
-                torch.isin(edge_index[0], torch.tensor(perturbation_target_indices))
-                | torch.isin(edge_index[1], torch.tensor(perturbation_target_indices))
-            )
-            perturbed_subgraph.edge_index = edge_index[:, mask]
-        else:
-            # No perturbation targets in this subgraph
-            pass
-    else:
+    if perturbation_type not in {"gene", "cre"}:
         raise ValueError("Invalid perturbation_type. Must be 'gene' or 'cre'.")
 
-    # Create a regression mask for the gene nodes
+    # map perturbation targets to subgraph node indices
+    node_id_map = {
+        old_idx: new_idx
+        for new_idx, old_idx in enumerate(perturbed_subgraph.n_id.tolist())
+    }
+    if perturbation_target_indices := [
+        node_id_map.get(target)
+        for target in perturbation_targets
+        if target in node_id_map
+    ]:
+        # identify edges to keep (edges not connected to perturbation targets)
+        edge_index = perturbed_subgraph.edge_index
+        mask = ~(
+            torch.isin(edge_index[0], torch.tensor(perturbation_target_indices))
+            | torch.isin(edge_index[1], torch.tensor(perturbation_target_indices))
+        )
+        perturbed_subgraph.edge_index = edge_index[:, mask]
+    # create regression mask for the gene nodes
     regression_mask = torch.zeros(perturbed_subgraph.num_nodes, dtype=torch.bool)
     node_id_map = {
         old_idx: new_idx
@@ -262,9 +321,7 @@ def perform_perturbation_analysis(
             idx_in_subgraph = node_id_map[gene_node]
             regression_mask[idx_in_subgraph] = True
 
-    # Perform inference on the perturbed subgraph
-    predictions = evaluator.inference_on_component(perturbed_subgraph, regression_mask)
-    return predictions
+    return evaluator.inference_on_component(perturbed_subgraph, regression_mask)
 
 
 def main() -> None:
@@ -313,7 +370,7 @@ def main() -> None:
     data = load_data(params)
 
     # Initialize evaluator
-    evaluator = ModelEvaluator(model=model, device=device)
+    evaluator = InSilicoPerturbation(model=model, device=device)
 
     # Load connected components and associations
     subgraphs, gene_associations, cre_associations = load_connected_components(

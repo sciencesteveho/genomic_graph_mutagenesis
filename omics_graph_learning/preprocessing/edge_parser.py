@@ -203,9 +203,9 @@ class EdgeParser:
             bedtools_objects["dyadic"] = None
 
         return (
-            self._add_slop_window(bedtools_objects["enhancer"], 1500),
-            self._add_slop_window(bedtools_objects["promoter"], 1500),
-            self._add_slop_window(bedtools_objects["dyadic"], 1500),
+            self._add_slop_window(bedtools_objects["enhancer"], 0),
+            self._add_slop_window(bedtools_objects["promoter"], 0),
+            self._add_slop_window(bedtools_objects["dyadic"], 0),
         )
 
     @time_decorator(print_args=True)
