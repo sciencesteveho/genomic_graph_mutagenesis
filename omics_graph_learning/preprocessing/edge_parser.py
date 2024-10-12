@@ -203,9 +203,9 @@ class EdgeParser:
             bedtools_objects["dyadic"] = None
 
         return (
-            self._add_slop_window(bedtools_objects["enhancer"], 500),
-            self._add_slop_window(bedtools_objects["promoter"], 500),
-            self._add_slop_window(bedtools_objects["dyadic"], 500),
+            self._add_slop_window(bedtools_objects["enhancer"], 1500),
+            self._add_slop_window(bedtools_objects["promoter"], 1500),
+            self._add_slop_window(bedtools_objects["dyadic"], 1500),
         )
 
     @time_decorator(print_args=True)
@@ -639,7 +639,7 @@ class EdgeParser:
 
     def _load_tss(self) -> BedTool:
         """Load TSS file and ignore any TSS that do not have a gene target.
-        Additionally, adds a slop of 2kb to the TSS for downstream overlap.
+        Additionally, adds a slop of 1500kb to the TSS for downstream overlap.
         Ignores non-gene TSS by checking the length of the tss name:
         gene-associated tss are annotated with one extra field.
 
@@ -654,7 +654,7 @@ class EdgeParser:
             return None
 
         tss = BedTool(f"{self.tss}")
-        return self._add_slop_window(tss.filter(_gene_only_tss), 2000)
+        return self._add_slop_window(tss.filter(_gene_only_tss), 1500)
 
     def _process_overlaps(
         self, overlaps: List[Tuple[BedTool, BedTool, str]]
@@ -672,7 +672,7 @@ class EdgeParser:
     def _parse_chromloop_basegraph(self, gene_gene: bool = False) -> Set[str]:
         """Performs overlaps and write edges for regulatory features connected
         by chromatin loops. For gene overlaps, anchors are connected if anchors
-        are within 2kb of the TSS. For regulatory features, anchors are
+        are within 1.5kb of the TSS. For regulatory features, anchors are
         connected if they directly overlap.
 
         Optional boolian 'gene_gene' specifies if gene_gene interactions will be
@@ -716,8 +716,8 @@ class EdgeParser:
 
         # add gene_gene interactions if specified
         if gene_gene:
-            gencode_2kb = self._add_slop_window(self.gencode_ref, 2000)
-            overlaps.append((gencode_2kb, gencode_2kb, "g_g"))
+            gencode_slopped = self._add_slop_window(self.gencode_ref, 2000)
+            overlaps.append((gencode_slopped, gencode_slopped, "g_g"))
 
         # perform two sets of overlaps
         return self._process_overlaps(overlaps)

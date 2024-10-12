@@ -36,7 +36,7 @@ fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shar
 
 feat_window: 6250
 
-gene_gene: false
+gene_gene: true
 
 graph_type: full
 
