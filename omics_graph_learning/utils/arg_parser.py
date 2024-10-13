@@ -103,6 +103,12 @@ class OGLCLIParser:
             default=False,
         )
         self.parser.add_argument("--n_gpus", type=int)
+        self.parser.add_argument(
+            "--model_name",
+            type=str,
+            default=None,
+            help="Alternative model name.",
+        )
 
     def add_model_arguments(self) -> None:
         """Add arguments related to GNN model configuration or training."""

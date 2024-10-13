@@ -42,8 +42,7 @@ from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import \
-    plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 
@@ -702,7 +701,10 @@ def _dump_metadata_json(
 ) -> None:
     """Dump metadata json to run directory."""
     metadata = vars(args)
-    metadata["experiment_name"] = experiment_config.experiment_name
+    if args.model_name:
+        metadata["experiment_name"] = args.model_name
+    else:
+        metadata["experiment_name"] = experiment_config.experiment_name
     metadata["start_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
     metadata["total_parameters"] = total_parameters
     with open(run_dir / "metadata.json", "w") as output:
@@ -714,9 +716,9 @@ def _experiment_setup(
 ) -> Tuple[Path, logging.Logger, TensorBoardLogger]:
     """Prepare directories and set up logging for experiment."""
     # set run directories
-    experiment_dir = (
-        experiment_config.root_dir / "models" / experiment_config.experiment_name
-    )
+    experiment_name = args.model_name or experiment_config.experiment_name
+
+    experiment_dir = experiment_config.root_dir / "models" / experiment_name
     run_dir = experiment_dir / f"run_{args.run_number}"
     tb_dir = experiment_dir / "tensorboard"
 
