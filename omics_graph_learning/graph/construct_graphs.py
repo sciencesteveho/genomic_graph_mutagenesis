@@ -61,9 +61,6 @@ class GraphConstructor:
         # hops
         graph = self._prune_nodes_without_gene_connections(graph)
 
-        # remove isolated nodes
-        graph = self._remove_isolated_nodes(graph)
-
         # populate graph with features
         graph = self._add_node_attributes(graph)
 
@@ -73,6 +70,9 @@ class GraphConstructor:
 
         # remove self loops
         graph = self._remove_self_loops(graph)
+
+        # remove isolated nodes
+        graph = self._remove_isolated_nodes(graph)
 
         self._log_gene_nodes(graph)
         return graph
