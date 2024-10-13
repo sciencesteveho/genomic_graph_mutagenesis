@@ -42,8 +42,7 @@ from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import \
-    plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 

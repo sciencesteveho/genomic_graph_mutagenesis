@@ -62,7 +62,7 @@ for config in "${configs[@]}"; do
     --learning_rate 0.00001 \
     --optimizer AdamW \
     --scheduler cosine \
-    --dropout 0.5 \
+    --dropout 0.3 \
     --residual distinct_source \
     --heads 2 \
     --positional_encoding
