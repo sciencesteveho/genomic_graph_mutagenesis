@@ -69,7 +69,7 @@ resources:
   tf_motifs: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/collapsed_motifs_overlapping_consensus_footprints_hg38.bed
   tpm: null
   tissue: nhek
-  rna: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/tpm/ENCFF223GBX.tsv
+  rna: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/tpm/ENCFF662VMK.tsv
   marker_name: NHEK
   ppi_tissue: NHEK
 
