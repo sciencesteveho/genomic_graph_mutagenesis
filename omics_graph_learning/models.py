@@ -773,7 +773,8 @@ def apply_mlp_layers(
 ) -> torch.Tensor:
     """Apply linear layers, normalization, activation, and optional dropout."""
     for linear_layer, layer_norm in zip(linear_layers, layer_norms):
-        x = layer_norm(activation(linear_layer(x)))
+        x = activation(layer_norm(linear_layer(x)))
+        # x = layer_norm(activation(linear_layer(x)))
         if isinstance(dropout_rate, float):
             x = F.dropout(x, p=dropout_rate, training=training)
     return x
