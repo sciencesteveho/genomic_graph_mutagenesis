@@ -25,13 +25,13 @@ from typing import (
 import pandas as pd
 from pybedtools import BedTool  # type: ignore
 
-from omics_graph_learning.config_handlers import ExperimentConfig
-from omics_graph_learning.config_handlers import TissueConfig
 from omics_graph_learning.preprocessing.rbp_network_filter import RBPNetworkFilter
 from omics_graph_learning.utils.common import _get_chromatin_loop_file
 from omics_graph_learning.utils.common import genes_from_gencode
 from omics_graph_learning.utils.common import setup_logging
 from omics_graph_learning.utils.common import time_decorator
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
+from omics_graph_learning.utils.config_handlers import TissueConfig
 from omics_graph_learning.utils.constants import ANCHOR_GRACE
 from omics_graph_learning.utils.constants import REGULATORY_ELEMENTS
 from omics_graph_learning.visualization.contacts import (

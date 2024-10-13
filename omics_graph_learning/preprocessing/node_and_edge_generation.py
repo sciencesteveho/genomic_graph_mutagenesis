@@ -9,8 +9,6 @@ import argparse
 import contextlib
 from typing import List
 
-from omics_graph_learning.config_handlers import ExperimentConfig
-from omics_graph_learning.config_handlers import TissueConfig
 from omics_graph_learning.graph.construct_graphs import construct_tissue_graph
 from omics_graph_learning.preprocessing.data_preprocessor import GenomeDataPreprocessor
 from omics_graph_learning.preprocessing.edge_parser import EdgeParser
@@ -18,6 +16,8 @@ from omics_graph_learning.preprocessing.local_context_parser import LocalContext
 from omics_graph_learning.split.target_consolidator import TrainingTargetConsolidator
 from omics_graph_learning.utils.common import _get_files_in_directory
 from omics_graph_learning.utils.common import setup_logging
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
+from omics_graph_learning.utils.config_handlers import TissueConfig
 from omics_graph_learning.utils.constants import ATTRIBUTES
 from omics_graph_learning.visualization.targets import generate_all_target_plots
 

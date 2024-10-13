@@ -10,8 +10,8 @@ from typing import List, Tuple, Union
 import pandas as pd
 from pybedtools import BedTool  # type: ignore
 
-from omics_graph_learning.config_handlers import TissueConfig
 from omics_graph_learning.utils.common import time_decorator
+from omics_graph_learning.utils.config_handlers import TissueConfig
 
 
 def read_encode_rna_seq_data(

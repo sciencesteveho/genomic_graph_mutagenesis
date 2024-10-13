@@ -15,9 +15,9 @@ from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 import plotly  # type: ignore
 
-from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.optimize_hyperparameters import set_optim_directory
 from omics_graph_learning.utils.common import setup_logging
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
 
 
 def display_results(

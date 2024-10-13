@@ -26,11 +26,11 @@ import numpy as np
 import torch
 from torch_geometric.data import Data  # type: ignore
 
-from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.perturbation.perturb_graph import get_node_perturbation
 from omics_graph_learning.perturbation.perturb_graph import perturb_edge_index
 from omics_graph_learning.perturbation.perturb_graph import perturb_node_features
 from omics_graph_learning.perturbation.perturb_graph import PerturbationConfig
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import NodePerturbation
 from omics_graph_learning.utils.constants import SUBSET_CHROMOSOMES
 from omics_graph_learning.utils.constants import TARGET_FILE

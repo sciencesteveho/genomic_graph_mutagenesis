@@ -17,12 +17,12 @@ from typing import Dict, List, Union
 
 import pandas as pd
 
-from omics_graph_learning.config_handlers import ExperimentConfig
-from omics_graph_learning.config_handlers import TissueConfig
 from omics_graph_learning.utils.common import _get_chromatin_loop_file
 from omics_graph_learning.utils.common import check_and_symlink
 from omics_graph_learning.utils.common import dir_check_make
 from omics_graph_learning.utils.common import time_decorator
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
+from omics_graph_learning.utils.config_handlers import TissueConfig
 from omics_graph_learning.utils.constants import REGULATORY_ELEMENTS
 
 # import requests
@@ -94,6 +94,7 @@ class GenomeDataPreprocessor:
         self.regulatory_schema = experiment_config.regulatory_schema
         self.root_dir = experiment_config.root_dir
         self.working_directory = experiment_config.working_directory
+        self.reference_dir = experiment_config.reference_dir
 
         self.interaction = tissue_config.interaction
         self.methylation = tissue_config.methylation
@@ -309,7 +310,9 @@ class GenomeDataPreprocessor:
     def _bigwig_to_filtered_bedgraph(self, path: str, file: str) -> str:
         """Convert bigwig to bedgraph file"""
         bed = f"{path}/{file}"
-        convert_cmd = f"{self.experiment_config.reference_dir}/bigWigToBedGraph {bed}.bigwig {bed}.bedGraph"
+        convert_cmd = (
+            f"{self.reference_dir}/bigWigToBedGraph {bed}.bigwig {bed}.bedGraph"
+        )
         filter_cmd = f"awk '$4 >= 0.8' {bed}.bedGraph > {bed}_gt80.bedGraph"
         for cmd in [convert_cmd, filter_cmd]:
             self._run_cmd(cmd)

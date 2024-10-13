@@ -28,7 +28,6 @@ from tqdm import tqdm  # type: ignore
 
 from omics_graph_learning.architecture_builder import build_gnn_architecture
 from omics_graph_learning.combination_loss import RMSEandBCELoss
-from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.graph_to_pytorch import GraphToPytorch
 from omics_graph_learning.perturbation.perturb_graph import PerturbationConfig
 from omics_graph_learning.schedulers import OptimizerSchedulerHandler
@@ -38,6 +37,7 @@ from omics_graph_learning.utils.common import dir_check_make
 from omics_graph_learning.utils.common import PyGDataChecker
 from omics_graph_learning.utils.common import setup_logging
 from omics_graph_learning.utils.common import tensor_out_to_array
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger

@@ -15,12 +15,12 @@ from typing import List, Optional, Tuple
 
 import pytest
 
-from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.arg_parser import OGLCLIParser
 from omics_graph_learning.utils.common import _dataset_split_name
 from omics_graph_learning.utils.common import _run_command
 from omics_graph_learning.utils.common import setup_logging
 from omics_graph_learning.utils.common import submit_slurm_job
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import N_TRIALS
 
 logger = setup_logging()

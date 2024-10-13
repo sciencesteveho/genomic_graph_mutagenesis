@@ -11,8 +11,8 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.common import time_decorator
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
 
 
 class GeneTrainTestSplitter:

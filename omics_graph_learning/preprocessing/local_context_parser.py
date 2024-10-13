@@ -21,8 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from pybedtools import BedTool  # type: ignore
 from pybedtools.featurefuncs import extend_fields  # type: ignore
 
-from omics_graph_learning.config_handlers import ExperimentConfig
-from omics_graph_learning.config_handlers import TissueConfig
 from omics_graph_learning.positional_encoding import PositionalEncoding
 from omics_graph_learning.utils.common import _chk_file_and_run
 from omics_graph_learning.utils.common import dir_check_make
@@ -30,6 +28,8 @@ from omics_graph_learning.utils.common import genes_from_gencode
 from omics_graph_learning.utils.common import get_physical_cores
 from omics_graph_learning.utils.common import setup_logging
 from omics_graph_learning.utils.common import time_decorator
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
+from omics_graph_learning.utils.config_handlers import TissueConfig
 from omics_graph_learning.utils.constants import ATTRIBUTES
 
 logger = setup_logging()

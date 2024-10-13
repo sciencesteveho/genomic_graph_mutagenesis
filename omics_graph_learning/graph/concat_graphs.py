@@ -14,10 +14,10 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-from omics_graph_learning.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.common import check_and_symlink
 from omics_graph_learning.utils.common import NumpyGraphChecker
 from omics_graph_learning.utils.common import setup_logging
+from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import TARGET_FILE
 from omics_graph_learning.utils.constants import TRAINING_SPLIT_FILE
 
