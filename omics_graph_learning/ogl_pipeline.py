@@ -245,6 +245,7 @@ class PipelineRunner:
             f"--dropout {args.dropout} "
             f"--split_name {split_name} "
             f"--run_number {run_number} "
+            f"--model_name {args.model_name} "
         )
 
         if args.heads:
@@ -262,8 +263,6 @@ class PipelineRunner:
                 train_args += f" --node_perturbation {args.node_perturbation}"
             if args.edge_perturbation:
                 train_args += f" --edge_perturbation {args.edge_perturbation}"
-            if args.model_name:
-                train_args += f" --model_name {args.model_name}"
         return train_args + bool_flags
 
     def submit_gnn_job(self, split_name: str, dependency: Optional[str]) -> None:

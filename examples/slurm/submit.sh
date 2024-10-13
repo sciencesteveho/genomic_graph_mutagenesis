@@ -68,28 +68,6 @@ for config in "${configs[@]}"; do
     --model_name regulatory_only_k562_allcontacts_global_gat_3layers_128dim
 done
 
-configs=(k562_allcontacts_global.yaml)
-for config in "${configs[@]}"; do
-  python ogl/omics_graph_learning/ogl_pipeline.py \
-    --partition RM \
-    --experiment_yaml ogl/configs/experiments/"${config}" \
-    --target rna_seq \
-    --model GAT \
-    --gnn_layers 3 \
-    --linear_layers 2 \
-    --activation gelu \
-    --dimensions 128 \
-    --batch_size 64 \
-    --learning_rate 0.0005 \
-    --optimizer AdamW \
-    --scheduler cosine \
-    --dropout 0.3 \
-    --residual distinct_source \
-    --heads 2 \
-    --positional_encoding \
-    --model_name regulatory_only_k562_allcontacts_global_gat_3layers_128dim
-done
-
 
 # configs=(all_celllines_alloopshicfdr.yaml)
 # for config in "${configs[@]}"; do
