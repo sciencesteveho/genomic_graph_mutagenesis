@@ -32,6 +32,7 @@ from omics_graph_learning.utils.common import _get_chromatin_loop_file
 from omics_graph_learning.utils.common import genes_from_gencode
 from omics_graph_learning.utils.common import setup_logging
 from omics_graph_learning.utils.common import time_decorator
+from omics_graph_learning.utils.constants import ANCHOR_GRACE
 from omics_graph_learning.utils.constants import REGULATORY_ELEMENTS
 from omics_graph_learning.visualization.contacts import (
     generate_chromatin_contact_density_plot,
@@ -203,9 +204,9 @@ class EdgeParser:
             bedtools_objects["dyadic"] = None
 
         return (
-            self._add_slop_window(bedtools_objects["enhancer"], 0),
-            self._add_slop_window(bedtools_objects["promoter"], 0),
-            self._add_slop_window(bedtools_objects["dyadic"], 0),
+            self._add_slop_window(bedtools_objects["enhancer"], ANCHOR_GRACE),
+            self._add_slop_window(bedtools_objects["promoter"], ANCHOR_GRACE),
+            self._add_slop_window(bedtools_objects["dyadic"], ANCHOR_GRACE),
         )
 
     @time_decorator(print_args=True)
@@ -323,74 +324,6 @@ class EdgeParser:
                     # -1,
                     "tf_marker",
                 )
-
-    # def _marbach_regulatory_circuits(
-    #     self,
-    #     interaction_file: str,
-    #     score_filter: int,
-    # ) -> Generator[Tuple[str, str, float, str], None, None]:
-    #     """Regulatory circuits from Marbach et al., Nature Methods, 2016. Each
-    #     network is in the following format:
-    #         col_1   TF
-    #         col_2   Target gene
-    #         col_3   Edge weight
-    #     """
-    #     reader = self._read_csv_wrapper(interaction_file)
-
-    #     scores = [
-    #         float(line[2])
-    #         for line in reader
-    #         if (
-    #             line[0] in self.genesymbol_to_gencode
-    #             and line[1] in self.genesymbol_to_gencode
-    #         )
-    #     ]
-    #     cutoff = np.percentile(scores, score_filter)
-
-    #     reader = self._read_csv_wrapper(interaction_file)  # Re-read the file
-    #     for line in reader:
-    #         tf, target_gene, weight = line[0], line[1], float(line[2])
-    #         if (
-    #             tf in self.genesymbol_to_gencode
-    #             and target_gene in self.genesymbol_to_gencode
-    #             and weight >= cutoff
-    #         ):
-    #             yield (
-    #                 f"{self.genesymbol_to_gencode[tf]}_tf",
-    #                 self.genesymbol_to_gencode[target_gene],
-    #                 # weight,
-    #                 "circuits",
-    #             )
-
-    # def _iid_ppi(
-    #     self,
-    #     interaction_file: str,
-    #     tissue: str,
-    #     # ) -> Generator[Tuple[str, str, float, str], None, None]:
-    # ) -> Generator[Tuple[str, str, str], None, None]:
-    #     """Protein-protein interactions from the Integrated Interactions
-    #     Database v 2021-05"""
-    #     reader = self._read_csv_wrapper(interaction_file)
-    #     header = next(reader)
-    #     idxs = {
-    #         key: header.index(key)
-    #         for key in ["symbol1", "symbol2", "evidence_type", "n_methods", tissue]
-    #     }
-
-    #     for line in reader:
-    #         if (
-    #             float(line[idxs[tissue]]) > 0
-    #             and int(line[idxs["n_methods"]]) >= 3
-    #             and "exp" in line[idxs["evidence_type"]]
-    #             and line[idxs["symbol1"]] in self.genesymbol_to_gencode
-    #             and line[idxs["symbol2"]] in self.genesymbol_to_gencode
-    #         ):
-    #             yield (
-    #                 self.genesymbol_to_gencode[line[idxs["symbol1"]]],
-    #                 self.genesymbol_to_gencode[line[idxs["symbol2"]]],
-    #                 # -1,
-    #                 "ppi",
-    #             )
 
     def _tfbinding_footprints(
         self,
