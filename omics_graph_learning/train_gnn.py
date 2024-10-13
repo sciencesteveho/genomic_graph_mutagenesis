@@ -716,7 +716,10 @@ def _experiment_setup(
 ) -> Tuple[Path, logging.Logger, TensorBoardLogger]:
     """Prepare directories and set up logging for experiment."""
     # set run directories
-    experiment_name = args.model_name or experiment_config.experiment_name
+    if args.model_name:
+        experiment_name = args.model_name
+    else:
+        experiment_name = experiment_config.experiment_name
 
     experiment_dir = experiment_config.root_dir / "models" / experiment_name
     run_dir = experiment_dir / f"run_{args.run_number}"
