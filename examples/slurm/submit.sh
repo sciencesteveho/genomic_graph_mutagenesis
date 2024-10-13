@@ -25,8 +25,7 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 
 
-
-configs=(k562_allcontacts_global.yaml)
+configs=(all_celllines_alloopshicfdr.yaml)
 for config in "${configs[@]}"; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
@@ -38,7 +37,7 @@ for config in "${configs[@]}"; do
     --activation gelu \
     --dimensions 200 \
     --batch_size 32 \
-    --learning_rate 0.00001 \
+    --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
     --dropout 0.3 \
@@ -47,7 +46,8 @@ for config in "${configs[@]}"; do
     --positional_encoding
 done
 
-# configs=(all_celllines_alloopshicfdr.yaml)
+
+# configs=(k562_allcontacts_global.yaml)
 # for config in "${configs[@]}"; do
 #   python ogl/omics_graph_learning/ogl_pipeline.py \
 #     --partition RM \
@@ -67,6 +67,8 @@ done
 #     --heads 2 \
 #     --positional_encoding
 # done
+
+
 
 
 # configs=(k562_allloopshicfdr_cosine.yaml k562_allloopshicfdr_global.yaml)

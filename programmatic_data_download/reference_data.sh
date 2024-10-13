@@ -560,3 +560,16 @@ echo "Finished preparing reference data. Total time: $(convertsecs SECONDS)"
 #         awk '{ if ($2 <= $3) print $0 }' "$file" > temp_file && mv temp_file "$file"
 #     fi
 # done
+# additionally, some lines have "chr23" which we also removed along with "chrX", "chrY", "chrM" and "chrMT"
+# for file in *; do
+#     echo "Processing $file"
+    
+#     # check if there are any malformed lines
+#     if awk '{ if ($1 ~ /chr23|chrX|chrY|chrM|chrMT/) exit 1 }' "$file"; then
+#         echo "No malformed lines found in $file"
+#     else
+#         echo "Malformed lines found in $file. Cleaning..."
+#         # remove malformed lines in-place
+#         awk '{ if ($1 !~ /chr23|chrX|chrY|chrM|chrMT/) print $0 }' "$file" > temp_file && mv temp_file "$file"
+#     fi
+# done
