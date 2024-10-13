@@ -27,22 +27,18 @@ class RMSEandBCELoss(nn.Module):
 
     Examples:
     --------
-    # Initialize custom loss
-    >>> criterion = RMSEandBCELoss(alpha=0.8)
+    # Initialize custom loss >>> criterion = RMSEandBCELoss(alpha=0.8)
 
-    # Compute the loss and backpropagate
-    >>> loss = criterion(
+    # Compute the loss and backpropagate >>> loss = criterion(
         regression_output=regression_output,
         regression_target=regression_target,
         classification_output=classification_output,
-        classification_target=classification_target,
-        mask=mask,
-        )
+        classification_target=classification_target, mask=mask, )
     >>> loss.backward()
     >>> optimizer.step()
     """
 
-    def __init__(self, alpha=0.8) -> None:
+    def __init__(self, alpha=0.85) -> None:
         """Initialize the custom loss function."""
         super(RMSEandBCELoss, self).__init__()
         if not (0.0 <= alpha <= 1.0):

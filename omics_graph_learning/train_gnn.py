@@ -180,6 +180,9 @@ class GNNTrainer:
         # backpropagation
         loss.backward()
 
+        # clip gradients
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+
         # log if last batch of epoch
         if self.tb_logger:
             self._log_tensorboard_data(
