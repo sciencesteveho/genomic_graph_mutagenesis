@@ -313,10 +313,10 @@ class GenomeDataPreprocessor:
         convert_cmd = (
             f"{self.reference_dir}/bigWigToBedGraph {bed}.bigwig {bed}.bedGraph"
         )
-        filter_cmd = f"awk '$4 >= 0.8' {bed}.bedGraph > {bed}_gt80.bedGraph"
+        filter_cmd = f"awk '$4 >= 0.8' {bed}.bedGraph > {bed}_gt80.bed"
         for cmd in [convert_cmd, filter_cmd]:
             self._run_cmd(cmd)
-        return f"{bed}_gt80.bedGraph"
+        return f"{bed}_gt80.bed"
 
     @time_decorator(print_args=True)
     def _merge_cpg(self, bed: Union[str, List[str]]) -> None:
@@ -334,7 +334,7 @@ class GenomeDataPreprocessor:
             cpg_percent_col = 11
 
         if self.methylation["cpg_filetype"] == "roadmap":
-            file = self._bigwig_to_filtered_bedgraph(
+            cpg_bed = self._bigwig_to_filtered_bedgraph(
                 path=f"{self.tissue_dir}/unprocessed",
                 file=cpg_bed.split(".bigwig")[0],
             )
@@ -360,7 +360,7 @@ class GenomeDataPreprocessor:
         #         | awk '$4 >= 0.8' \
         #         > {file}"
         else:
-            file = f"{self.tissue_dir}/unprocessed/{bed}"
+            file = f"{cpg_bed}_lifted"
 
         bedtools_cmd = f"bedtools merge \
             -i {file} \
