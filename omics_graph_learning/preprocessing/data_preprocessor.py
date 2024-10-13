@@ -309,14 +309,11 @@ class GenomeDataPreprocessor:
     @time_decorator(print_args=True)
     def _bigwig_to_filtered_bedgraph(self, path: str, file: str) -> str:
         """Convert bigwig to bedgraph file"""
-        bed = f"{path}/{file}"
-        convert_cmd = (
-            f"{self.reference_dir}/bigWigToBedGraph {bed}.bigwig {bed}.bedGraph"
-        )
-        filter_cmd = f"awk '$4 >= 0.8' {bed}.bedGraph > {bed}_gt80.bed"
+        convert_cmd = f"{self.reference_dir}/bigWigToBedGraph {path}/{file}.bigwig {path}/{file}.bedGraph"
+        filter_cmd = f"awk '$4 >= 0.8' {path}/{file}.bedGraph > {path}/{file}_gt80.bed"
         for cmd in [convert_cmd, filter_cmd]:
             self._run_cmd(cmd)
-        return f"{bed}_gt80.bed"
+        return f"{file}_gt80.bed"
 
     @time_decorator(print_args=True)
     def _merge_cpg(self, bed: Union[str, List[str]]) -> None:
