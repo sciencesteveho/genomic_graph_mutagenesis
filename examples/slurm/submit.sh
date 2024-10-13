@@ -25,8 +25,6 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 
 
-
-
 configs=(all_celllines_alloopshicfdr.yaml)
 for config in "${configs[@]}"; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
@@ -39,7 +37,7 @@ for config in "${configs[@]}"; do
     --activation gelu \
     --dimensions 200 \
     --batch_size 32 \
-    --learning_rate 0.0005 \
+    --learning_rate 0.00001 \
     --optimizer AdamW \
     --scheduler cosine \
     --dropout 0.3 \
@@ -60,8 +58,8 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 64 \
-    --learning_rate 0.0001 \
+    --batch_size 32 \
+    --learning_rate 0.00001 \
     --optimizer AdamW \
     --scheduler cosine \
     --dropout 0.5 \
