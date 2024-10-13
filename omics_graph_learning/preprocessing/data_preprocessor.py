@@ -357,7 +357,7 @@ class GenomeDataPreprocessor:
         #         | awk '$4 >= 0.8' \
         #         > {file}"
         else:
-            file = f"{cpg_bed}_lifted"
+            file = f"{self.tissue_dir}/unprocessed/{cpg_bed}_lifted"
 
         bedtools_cmd = f"bedtools merge \
             -i {file} \
