@@ -91,8 +91,7 @@ def combine_targets(
             targets = pickle.load(f)
         for key in result:
             for subkey, value in targets[key].items():
-                new_subkey = f"{tissue}_{subkey}"
-                result[key][new_subkey] = value
+                result[key][subkey] = value
     return result
 
 
