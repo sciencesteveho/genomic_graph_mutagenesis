@@ -334,7 +334,7 @@ class GenomeDataPreprocessor:
             cpg_percent_col = 11
 
         if self.methylation["cpg_filetype"] == "roadmap":
-            cpg_bed = self._bigwig_to_filtered_bedgraph(
+            file = self._bigwig_to_filtered_bedgraph(
                 path=f"{self.tissue_dir}/unprocessed",
                 file=cpg_bed.split(".bigwig")[0],
             )
