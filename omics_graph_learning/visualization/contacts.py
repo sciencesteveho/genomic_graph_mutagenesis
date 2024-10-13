@@ -81,7 +81,7 @@ def plot_contact_size_distribution(
     plt.title("Distribution of Chromatin Contact Sizes")
     plt.tight_layout()
     plt.savefig(
-        save_path / "contact_size_distribution.png", dpi=300, bbox_inches="tight"
+        save_path / "contact_size_distribution.png", dpi=450, bbox_inches="tight"
     )
 
 

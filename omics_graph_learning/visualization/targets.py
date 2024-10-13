@@ -105,7 +105,7 @@ def plot_target_distribution(
     plt.title(title)
     plt.legend(labels=["Train", "Validation", "Test"])
     plt.tight_layout()
-    plt.savefig(save_path / save_file, dpi=300, bbox_inches="tight")
+    plt.savefig(save_path / save_file, dpi=450, bbox_inches="tight")
 
 
 def combine_gene_distributions(
@@ -162,7 +162,7 @@ def gene_barplots_per_chromosome(
     plt.title("Number of Targets per Chromosome")
     plt.tight_layout()
     plt.savefig(
-        save_path / "regression_target_counts.png", dpi=300, bbox_inches="tight"
+        save_path / "regression_target_counts.png", dpi=450, bbox_inches="tight"
     )
 
 

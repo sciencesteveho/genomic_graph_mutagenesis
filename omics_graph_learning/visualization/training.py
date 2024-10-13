@@ -147,5 +147,5 @@ def plot_predicted_versus_expected(
         verticalalignment="top",
     )
     plt.tight_layout()
-    plot.savefig(save_path / "performance.png", dpi=300, bbox_inches="tight")
+    plot.savefig(save_path / "performance.png", dpi=450, bbox_inches="tight")
     return plot.figure

@@ -42,7 +42,8 @@ from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import \
+    plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 
@@ -751,7 +752,7 @@ def calculate_min_epochs(args: argparse.Namespace) -> int:
     warm-up steps.
     """
     if args.scheduler in ("linear_warmup", "cosine"):
-        min_epochs = math.ceil(0.1 * args.epochs)
+        min_epochs = math.ceil(0.15 * args.epochs)
         min_epochs += EARLY_STOP_PATIENCE // 2
         return min_epochs
     return 0

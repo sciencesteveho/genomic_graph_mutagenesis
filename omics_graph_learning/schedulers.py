@@ -124,7 +124,7 @@ class OptimizerSchedulerHandler:
         optimizer: Optimizer,
         num_warmup_steps: int,
         num_training_steps: int,
-        num_cycles: float = 5.0,
+        num_cycles: float = 1.0,
         last_epoch: int = -1,
     ) -> LRScheduler:
         """
