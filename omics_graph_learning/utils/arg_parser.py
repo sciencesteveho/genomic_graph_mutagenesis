@@ -154,7 +154,7 @@ class OGLCLIParser:
             default=None,
             choices=["shared_source", "distinct_source", "None"],
         )
-        self.parser.add_argument("--epochs", type=int, default=100)
+        self.parser.add_argument("--epochs", type=int, default=60)
         self.parser.add_argument("--batch_size", type=int, default=256)
         self.parser.add_argument("--learning_rate", type=float, default=1e-4)
         self.parser.add_argument(
