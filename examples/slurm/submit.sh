@@ -25,7 +25,8 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 
 
-configs=(all_celllines_alloopshicfdr.yaml)
+
+configs=(k562_allcontacts_global.yaml)
 for config in "${configs[@]}"; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
@@ -46,27 +47,48 @@ for config in "${configs[@]}"; do
     --positional_encoding
 done
 
+# configs=(all_celllines_alloopshicfdr.yaml)
+# for config in "${configs[@]}"; do
+#   python ogl/omics_graph_learning/ogl_pipeline.py \
+#     --partition RM \
+#     --experiment_yaml ogl/configs/experiments/"${config}" \
+#     --target rna_seq \
+#     --model GAT \
+#     --gnn_layers 2 \
+#     --linear_layers 2 \
+#     --activation gelu \
+#     --dimensions 200 \
+#     --batch_size 32 \
+#     --learning_rate 0.00001 \
+#     --optimizer AdamW \
+#     --scheduler cosine \
+#     --dropout 0.3 \
+#     --residual distinct_source \
+#     --heads 2 \
+#     --positional_encoding
+# done
 
-configs=(k562_allloopshicfdr_cosine.yaml k562_allloopshicfdr_global.yaml)
-for config in "${configs[@]}"; do
-  python ogl/omics_graph_learning/ogl_pipeline.py \
-    --partition RM \
-    --experiment_yaml ogl/configs/experiments/"${config}" \
-    --target rna_seq \
-    --model GAT \
-    --gnn_layers 2 \
-    --linear_layers 2 \
-    --activation gelu \
-    --dimensions 200 \
-    --batch_size 32 \
-    --learning_rate 0.00001 \
-    --optimizer AdamW \
-    --scheduler cosine \
-    --dropout 0.3 \
-    --residual distinct_source \
-    --heads 2 \
-    --positional_encoding
-done
+
+# configs=(k562_allloopshicfdr_cosine.yaml k562_allloopshicfdr_global.yaml)
+# for config in "${configs[@]}"; do
+#   python ogl/omics_graph_learning/ogl_pipeline.py \
+#     --partition RM \
+#     --experiment_yaml ogl/configs/experiments/"${config}" \
+#     --target rna_seq \
+#     --model GAT \
+#     --gnn_layers 2 \
+#     --linear_layers 2 \
+#     --activation gelu \
+#     --dimensions 200 \
+#     --batch_size 32 \
+#     --learning_rate 0.00001 \
+#     --optimizer AdamW \
+#     --scheduler cosine \
+#     --dropout 0.3 \
+#     --residual distinct_source \
+#     --heads 2 \
+#     --positional_encoding
+# done
 
 # configs=(all_celllines_alloopshicfdr.yaml)
 # for config in "${configs[@]}"; do
