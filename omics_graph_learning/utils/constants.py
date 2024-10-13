@@ -56,7 +56,7 @@ class NodePerturbation(Enum):
 
 # integer constants
 ANCHOR_GRACE = 1500
-EARLY_STOP_PATIENCE = 10
+EARLY_STOP_PATIENCE = 12
 HG38_TOTAL_BASEPAIRS = 3088269227
 MAX_FEAT_LEN = 39  # 37 node features + is_gene + is_tf
 N_TRIALS = 200

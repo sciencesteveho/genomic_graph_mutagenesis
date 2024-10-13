@@ -7,6 +7,7 @@ the OGL pipeline."""
 
 
 import argparse
+from collections import deque
 import json
 import logging
 import math
@@ -41,7 +42,8 @@ from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import \
+    plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 
@@ -372,10 +374,11 @@ class GNNTrainer:
         self.tb_logger.log_hyperparameters(vars(args))
 
         # set up early stopping counter
+        validation_loss_window = deque(maxlen=5)
         best_validation = float("inf")
         stop_counter = 0
 
-        for epoch in range(epochs + 1):
+        for epoch in range(1, epochs + 1):
             self.logger.info(f"Epoch: {epoch:03d}")
 
             # train
@@ -417,9 +420,16 @@ class GNNTrainer:
 
             # early stopping logic
             if args.early_stop:
-                if val_loss < best_validation:
+                validation_loss_window.append(val_loss)
+
+                # compute smoothed validation loss
+                smoothed_val_loss = sum(validation_loss_window) / len(
+                    validation_loss_window
+                )
+
+                if smoothed_val_loss < best_validation:
                     stop_counter = 0
-                    best_validation = val_loss
+                    best_validation = smoothed_val_loss
                     torch.save(
                         self.model.state_dict(),
                         model_dir / f"{args.model}_best_model.pt",
@@ -742,7 +752,7 @@ def calculate_min_epochs(args: argparse.Namespace) -> int:
     warm-up steps.
     """
     if args.scheduler in ("linear_warmup", "cosine"):
-        min_epochs = math.ceil(0.1 * args.epochs // 2)
+        min_epochs = math.ceil(0.1 * args.epochs)
         min_epochs += EARLY_STOP_PATIENCE // 2
         return min_epochs
     return 0
