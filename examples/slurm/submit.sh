@@ -27,6 +27,30 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 # BEST PERFORMING
 # /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_only_k562_allloopshicfdr_global_GAT_smoothval
 
+for cell in gm12878 hepg2 h1_esc imr90 hmec nhekl; do
+  configs=("${cell}_allloopshicfdr_global.yaml")
+  for config in "${configs[@]}"; do
+    python ogl/omics_graph_learning/ogl_pipeline.py \
+      --partition RM \
+      --experiment_yaml ogl/configs/experiments/"${config}" \
+      --target rna_seq \
+      --model GAT \
+      --gnn_layers 2 \
+      --linear_layers 2 \
+      --activation gelu \
+      --dimensions 200 \
+      --batch_size 64 \
+      --learning_rate 0.0005 \
+      --optimizer AdamW \
+      --scheduler cosine \
+      --dropout 0.3 \
+      --residual distinct_source \
+      --heads 2 \
+      --positional_encoding \
+      --model_name regulatory_only_"${cell}"_allloopshicfdr_gat_2layers_200dim
+  done
+done
+
 
 configs=(all_celllines_alloopshicfdr.yaml)
 for config in "${configs[@]}"; do
