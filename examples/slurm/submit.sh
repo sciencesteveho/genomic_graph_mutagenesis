@@ -149,7 +149,7 @@ for config in "${configs[@]}"; do
     --experiment_yaml ogl/configs/experiments/"${config}" \
     --target rna_seq \
     --model GAT \
-    --gnn_layers 3 \
+    --gnn_layers 4 \
     --linear_layers 2 \
     --activation gelu \
     --dimensions 128 \
@@ -161,7 +161,7 @@ for config in "${configs[@]}"; do
     --residual distinct_source \
     --heads 4 \
     --positional_encoding \
-    --model_name regulatory_only_k562_allcontacts_global_gat_3layers_128dim_4attnheads
+    --model_name regulatory_only_k562_allcontacts_global_gat_4layers_128dim_4attnheads
 done
 
 
