@@ -317,24 +317,37 @@ class GNNTrainer:
         pbar.close()
         average_loss = total_loss / total_examples if total_examples > 0 else 0.0
 
-        # compute regression metrics
-        rmse, pearson_r = self._compute_regression_metrics(
-            regression_outs, regression_labels
-        )
-
-        # compute classification metrics
-        accuracy = self._compute_classification_metrics(
-            classification_outs, classification_labels
-        )
-
         return (
-            average_loss,
-            rmse,
             torch.cat(regression_outs),
             torch.cat(regression_labels),
-            pearson_r,
-            accuracy,
         )
+
+    @torch.no_grad()
+    def evaluate_single(
+        self,
+        data: torch_geometric.data.Data,
+        mask: str,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Evaluate a single data object."""
+        self.model.eval()
+
+        mask = getattr(data, f"{mask}_mask_loss")
+        if mask.sum() == 0:
+            return torch.tensor([]), torch.tensor([])
+
+        data = data.to(self.device)
+        # forward pass
+        regression_out, logits = self.model(
+            x=data.x,
+            edge_index=data.edge_index,
+            mask=mask,
+        )
+
+        # collect masked outputs and labels
+        regression_out_masked = self._ensure_tensor_dim(regression_out[mask])
+        labels_masked = self._ensure_tensor_dim(data.y[mask])
+
+        return regression_out_masked.cpu(), labels_masked.cpu()
 
     @staticmethod
     def _compute_regression_metrics(
@@ -450,7 +463,9 @@ def calculate_fold_change(
     return perturbation_tpm / baseline_tpm
 
 
-def get_subgraph(data: Data, graph: nx.Graph, target_node: int) -> Data:
+def get_subgraph(
+    data: Data, graph: nx.Graph, target_node: int
+) -> Tuple[Data, Dict[int, int]]:
     """Extracts the entire connected component containing the given target node
     from a PyG Data object. Requires the networkX representation of the graph for
     faster traversal.
@@ -459,34 +474,86 @@ def get_subgraph(data: Data, graph: nx.Graph, target_node: int) -> Data:
         Data: A new PyG Data object containing the subgraph for the connected
         component.
     """
-    # make a copy of graph to avoid modifying the original
-    extract_graph = graph.copy()
-
-    # make a mask for the target node
-    mask = torch.zeros(data.num_nodes, dtype=torch.bool)
-    mask[target_node] = True
-    extract_graph.mask = mask
-
     # find the connected component containing the target node
-    for component in nx.connected_components(extract_graph):
+    for component in nx.connected_components(graph):
         if target_node in component:
-            subgraph_nodes = component
+            subgraph_nodes = list(component)
             break
+    else:
+        raise ValueError(f"Target node {target_node} not found in the graph.")
 
-    # extract the subgraph from the original graph
-    subgraph = graph.subgraph(subgraph_nodes)
+    # create mapping from original node indices to subgraph node indices
+    mapping = {node: i for i, node in enumerate(subgraph_nodes)}
 
-    # convert the subgraph back to a PyG Data object
+    # create subgraph with relabeled nodes
+    subgraph = graph.subgraph(subgraph_nodes).copy()
+    subgraph = nx.relabel_nodes(subgraph, mapping)
+
+    # convert to PyG Data object
     sub_data = from_networkx(subgraph)
 
-    # copy node features and labels from the original graph
-    sub_data.x = data.x[list(subgraph_nodes)]
-    sub_data.y = data.y[list(subgraph_nodes)]
+    # create a tensor of original node indices in subgraph node index order
+    n_id = torch.tensor(subgraph_nodes, dtype=torch.long)
 
-    # inherit mask
-    sub_data.test_mask_loss = mask[list(subgraph_nodes)]
+    # copy features and labels from original data using n_id
+    sub_data.x = data.x[n_id]
+    sub_data.y = data.y[n_id]
+    sub_data.class_labels = data.class_labels[n_id]
 
-    return sub_data
+    # create mask for the target node
+    target_node_subgraph_idx = mapping[target_node]
+    sub_data.test_mask_loss = torch.zeros(sub_data.num_nodes, dtype=torch.bool)
+    sub_data.test_mask_loss[target_node_subgraph_idx] = True
+
+    return sub_data, mapping
+
+
+def delete_node(data: Data, node_idx: int) -> Data:
+    """
+    Deletes a node from the PyG Data object.
+
+    Args:
+        data (Data): The PyG Data object.
+        node_idx (int): The index of the node to delete in the subgraph.
+
+    Returns:
+        Data: A new PyG Data object with the specified node removed.
+    """
+    # Create mask to exclude the node
+    mask = torch.ones(data.num_nodes, dtype=torch.bool)
+    mask[node_idx] = False
+
+    # Filter nodes
+    new_x = data.x[mask]
+    new_y = data.y[mask]
+    new_class_labels = data.class_labels[mask]
+
+    # Filter edges: keep edges where both nodes are not deleted
+    edge_mask = mask[data.edge_index[0]] & mask[data.edge_index[1]]
+    new_edge_index = data.edge_index[:, edge_mask]
+
+    # Reindex edges to account for removed nodes
+    # Create a mapping from old node indices to new node indices
+    mapping = torch.full((data.num_nodes,), -1, dtype=torch.long)
+    mapping[mask] = torch.arange(new_x.size(0))
+
+    # Update edge_index with the new node indices
+    new_edge_index = mapping[new_edge_index].to(torch.long)
+
+    # Remove any edges that may have invalid indices after mapping
+    valid_edge_mask = (new_edge_index[0] >= 0) & (new_edge_index[1] >= 0)
+    new_edge_index = new_edge_index[:, valid_edge_mask]
+
+    # Update the mask for the target node
+    new_test_mask_loss = data.test_mask_loss[mask]
+
+    return Data(
+        x=new_x,
+        edge_index=new_edge_index,
+        y=new_y,
+        class_labels=new_class_labels,
+        test_mask_loss=new_test_mask_loss,
+    )
 
 
 def load_gencode_lookup(filepath: str) -> Dict[str, str]:
@@ -708,38 +775,19 @@ def main() -> None:
     )  # 11,147 E_G pairs
     crispri_test = create_crispri_dict(crispri_test)  # 1,868 genes
 
-    # Some for testing:
-    (487024, 11855, "FALSE"),
-    (242639, 106, "TRUE"),
-    (486837, 11855, "FALSE"),
-    (665979, 4811, "FALSE"),
-    (301526, 2864, "FALSE"),
-    (486838, 716, "FALSE"),
-    (90267, 17948, "FALSE"),
-    (412026, 14109, "TRUE"),
-    (320736, 10356, "TRUE"),
+    true_fold_changes = {}
+    false_fold_changes = {}
 
-    # get the subgraph
-    # test = get_subgraph(graph, nx_graph, 11855)
+    for gene_idx, enhancer in crispri_test.items():
+        enhancer_idx = enhancer[0]
+        flag = enhancer[1]
 
-    # for each loop,
-    # get subgraph
-    # run baseline inference on subgraph
-    # delete target node
-    # run new inference on subgraph
-    # calculate fold change
-    # delete random node
-    # run new inference on subgraph
-    # calculate fold change
-    # save crispri dictionary with key (element, gene) value fold_change
-
-    # iterate over crispri links
-    # remember (idx, gene, flag)
-    crispr_link = (242639, 106, "TRUE")
-    for crispr_link in crispri_links:
-
-        # get subgraph
-        subgraph = get_subgraph(graph, nx_graph, crispr_link[1])
+        # get subgraph for the current gene
+        # try:
+        subgraph, mapping = get_subgraph(graph, nx_graph, gene_idx)
+        # except ValueError as e:
+        #     print(e)
+        #     continue  # Skip to the next link if subgraph not found
 
         # init evaluator
         evaluator = GNNTrainer(
@@ -748,36 +796,22 @@ def main() -> None:
             data=subgraph,
         )
 
-        # get loader
-        loader = make_loader(subgraph)
-
         # get baseline prediction
-        _, _, out, label, _, _ = evaluator.evaluate(
-            data_loader=loader,
+        out, label = evaluator.evaluate_single(
+            data=subgraph,
             mask="test",
-            epoch=0,
         )
 
-        #
+        # ensure that the output contains exactly one value
+        if out.numel() != 1 or label.numel() != 1:
+            print(f"Unexpected number of outputs for gene {gene_idx}. Skipping.")
+            # continue
 
-    # loss, rmse, outs, labels, pearson_r, accuracy = post_eval_trainer.evaluate(
-    #     data_loader=data_loader,
-    #     mask="test",
-    #     epoch=0,
-    # )
+        baseline_prediction = out.item()
+        target_label = label.item()
 
-    # # save final eval
-    # np.save(run_dir / "outs.npy", outs.numpy())
-    # np.save(run_dir / "labels.npy", labels.numpy())
-    # for step, (out, label) in enumerate(zip(outs, labels)):
-    #     tb_logger.writer.add_scalar("Predictions", out.item(), step)
-    #     tb_logger.writer.add_scalar("Labels", label.item(), step)
-
-    # # bootstrap evaluation
-    # mean_correlation, ci_lower, ci_upper = bootstrap_evaluation(
-    #     predictions=outs,
-    #     labels=labels,
-    # )
+        if enhancer_idx in mapping:
+            enhancer_subgraph_idx = mapping[enhancer_idx]
 
 
 if __name__ == "__main__":
