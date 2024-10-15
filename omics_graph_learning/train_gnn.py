@@ -42,7 +42,8 @@ from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import \
+    plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 
@@ -812,7 +813,7 @@ def main() -> None:
     )
     test_loader = NeighborLoader(
         data,
-        num_neighbors=[-1],  # all neighbors at each hop
+        num_neighbors=[data.avg_edges] * args.gnn_layers,
         batch_size=args.batch_size,
         input_nodes=getattr(data, f"test_mask{mask_suffix}"),
         shuffle=False,

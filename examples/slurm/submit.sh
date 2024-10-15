@@ -26,6 +26,15 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 # BEST PERFORMING
 # /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_only_k562_allcontacts_global_gat_2layers_200dim_4attnheads
+# regulatory_only_k562_allloopshicfdr_global_UniMPTransformer_2layers_200dim
+# regulatory_only_imr90_allcontacts_global/run_3/performance.png
+# regulatory_only_hepg2_esc_allcontacts_global/run_3/performance.png
+# regulatory_only_h1_esc_allcontacts_global/run_3/performance.png
+# regulatory_only_gm12878_allcontacts_global/run_3/performance.png
+
+
+# re-submit
+#  26305306           26305308
 
 
 # all cell lines with best params, all contacts 
@@ -49,7 +58,8 @@ for cell in gm12878 hepg2 h1_esc imr90 hmec nhek; do
       --dropout 0.3 \
       --residual distinct_source \
       --heads 4 \
-      --positional_encoding
+      --positional_encoding \
+      --model_name regulatory_only_"${cell}"_allcontacts_global_gat_2layers_200dim_4attnheads
   done
 done
 

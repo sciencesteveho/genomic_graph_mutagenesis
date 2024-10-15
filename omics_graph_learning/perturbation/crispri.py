@@ -452,15 +452,27 @@ def load_graph(
     return graph, graph_idxs, pyg
 
 
-def calculate_fold_change(
+def calculate_percent_fold_change(
     baseline_prediction: float, perturbation_prediction: float
 ) -> float:
-    """Convert regression values back to TPM to calculate the fold change
-    difference.
+    """Convert regression values back to TPM and calculate the percent fold
+    change.
     """
     baseline_tpm = 2 ** (baseline_prediction - 0.25)
     perturbation_tpm = 2 ** (perturbation_prediction - 0.25)
-    return perturbation_tpm / baseline_tpm
+
+    # Calculate fold change
+    fold_change = perturbation_tpm / baseline_tpm
+
+    return (fold_change - 1) * 100
+
+
+def calculate_log2_fold_change(
+    baseline_prediction: float, perturbation_prediction: float
+) -> float:
+    """Calculate the log2 fold change from log2-transformed values."""
+    log2_fold_change = perturbation_prediction - baseline_prediction
+    return (2**log2_fold_change - 1) * 100
 
 
 def get_subgraph(
@@ -519,8 +531,8 @@ def delete_node(data: Data, node_idx: int) -> Data:
     Returns:
         Data: A new PyG Data object with the specified node removed.
     """
-    # Create mask to exclude the node
-    mask = torch.ones(data.num_nodes, dtype=torch.bool)
+    # Ensure mask is on the same device as edge_index
+    mask = torch.ones(data.num_nodes, dtype=torch.bool, device=data.edge_index.device)
     mask[node_idx] = False
 
     # Filter nodes
@@ -534,8 +546,10 @@ def delete_node(data: Data, node_idx: int) -> Data:
 
     # Reindex edges to account for removed nodes
     # Create a mapping from old node indices to new node indices
-    mapping = torch.full((data.num_nodes,), -1, dtype=torch.long)
-    mapping[mask] = torch.arange(new_x.size(0))
+    mapping = torch.full(
+        (data.num_nodes,), -1, dtype=torch.long, device=data.edge_index.device
+    )
+    mapping[mask] = torch.arange(new_x.size(0), device=data.edge_index.device)
 
     # Update edge_index with the new node indices
     new_edge_index = mapping[new_edge_index].to(torch.long)
@@ -725,14 +739,30 @@ def perturb_crispri(
     raise NotImplementedError
 
 
-def make_loader(
-    data: Data,
+def create_full_neighbor_loader(
+    data: Data, target_node: int, enhancer_nodes: List[int], num_layers: int = 10
 ) -> NeighborLoader:
-    """Make a neighbor loader for the data."""
+    """
+    Creates a NeighborLoader to sample neighbors, ensuring the target node
+    and all associated enhancers are included in a single batch.
+
+    Args:
+        data (Data): The PyG Data object.
+        target_node (int): The index of the target gene node.
+        enhancer_nodes (List[int]): List of enhancer node indices associated with the gene.
+        num_layers (int): Number of layers to sample.
+
+    Returns:
+        NeighborLoader: Configured NeighborLoader instance.
+    """
+    input_nodes = torch.tensor([target_node] + enhancer_nodes, dtype=torch.long)
+    batch_size = len(input_nodes)
+
     return NeighborLoader(
-        data,
-        num_neighbors=[-1],  # all neighbors at each hop
-        batch_size=1,
+        data=data,
+        num_neighbors=[data.avg_edges] * num_layers,
+        input_nodes=input_nodes,
+        batch_size=batch_size,
         shuffle=False,
     )
 
@@ -758,6 +788,10 @@ def main() -> None:
     with open(idx_file, "rb") as f:
         idxs = pickle.load(f)
 
+    # get a dictionary of all enhancer idxs
+    enhancer_idxs = {k: v for k, v in idxs.items() if "enhancer" in k}
+    enhancer_orig_indices = set(enhancer_idxs.values())  # Set for faster lookup
+
     # load the model
     model = load_model("GAT_best_model.pt", device, device)
 
@@ -775,43 +809,194 @@ def main() -> None:
     )  # 11,147 E_G pairs
     crispri_test = create_crispri_dict(crispri_test)  # 1,868 genes
 
+    # Initialize dictionaries to store fold changes
     true_fold_changes = {}
     false_fold_changes = {}
+    random_fold_changes = {}
 
-    for gene_idx, enhancer in crispri_test.items():
-        enhancer_idx = enhancer[0]
-        flag = enhancer[1]
+    for gene_idx, enhancers in tqdm(crispri_test.items(), desc="Processing Genes"):
+        print(f"Processing gene {gene_idx} with {len(enhancers)} enhancers...")
 
-        # get subgraph for the current gene
-        # try:
-        subgraph, mapping = get_subgraph(graph, nx_graph, gene_idx)
-        # except ValueError as e:
-        #     print(e)
-        #     continue  # Skip to the next link if subgraph not found
+        enhancer_indices = [enhancer[0] for enhancer in enhancers]
 
-        # init evaluator
-        evaluator = GNNTrainer(
-            model=model,
-            device=device,
-            data=subgraph,
+        # Create NeighborLoader for the gene and all its enhancers
+        loader = create_full_neighbor_loader(
+            data=graph,
+            target_node=gene_idx,
+            enhancer_nodes=enhancer_indices,
+            num_layers=10,
         )
 
-        # get baseline prediction
-        out, label = evaluator.evaluate_single(
-            data=subgraph,
-            mask="test",
-        )
+        # Iterate over the loader to get the subgraph (only one batch per gene)
+        for batch in loader:
+            sub_data = batch.to(device)
 
-        # ensure that the output contains exactly one value
-        if out.numel() != 1 or label.numel() != 1:
-            print(f"Unexpected number of outputs for gene {gene_idx}. Skipping.")
-            # continue
+            # Map original node indices to subgraph node indices
+            n_id = batch.n_id
+            mapping = {
+                int(orig_idx): i for i, orig_idx in enumerate(n_id.cpu().numpy())
+            }
 
-        baseline_prediction = out.item()
-        target_label = label.item()
+            target_subgraph_idx = mapping.get(gene_idx)
+            if target_subgraph_idx is None:
+                print(
+                    f"Target gene {gene_idx} not found in the sampled subgraph. Skipping."
+                )
+                continue
 
-        if enhancer_idx in mapping:
-            enhancer_subgraph_idx = mapping[enhancer_idx]
+            # Create mask for the target node in the subgraph
+            sub_data.test_mask_loss = torch.zeros(
+                sub_data.num_nodes, dtype=torch.bool, device=device
+            )
+            sub_data.test_mask_loss[target_subgraph_idx] = True
+
+            # Initialize evaluator
+            evaluator = GNNTrainer(
+                model=model,
+                device=device,
+                data=sub_data,
+            )
+
+            # Get baseline prediction
+            out, label = evaluator.evaluate_single(
+                data=sub_data,
+                mask="test",
+            )
+
+            if out.numel() != 1 or label.numel() != 1:
+                print(f"Unexpected number of outputs for gene {gene_idx}. Skipping.")
+                continue
+
+            baseline_prediction = out.item()
+            target_label = label.item()
+
+            # Process each enhancer associated with the gene
+            for enhancer in enhancers:
+                enhancer_idx = enhancer[0]
+                flag = enhancer[1]
+
+                # Check if enhancer is in subgraph
+                enhancer_subgraph_idx = mapping.get(enhancer_idx)
+                if enhancer_subgraph_idx is None:
+                    print(
+                        f"Enhancer {enhancer_idx} not found in subgraph for gene {gene_idx}. Skipping."
+                    )
+                    continue
+
+                # Delete enhancer node
+                modified_subgraph = delete_node(sub_data, enhancer_subgraph_idx)
+
+                # Run inference on modified subgraph
+                modified_evaluator = GNNTrainer(
+                    model=model,
+                    device=device,
+                    data=modified_subgraph,
+                )
+
+                modified_out, _ = modified_evaluator.evaluate_single(
+                    data=modified_subgraph,
+                    mask="test",
+                )
+
+                if modified_out.numel() != 1:
+                    print(
+                        f"Unexpected number of outputs after deleting enhancer {enhancer_idx} for gene {gene_idx}. Skipping."
+                    )
+                    continue
+
+                perturbation_prediction = modified_out.item()
+                fold_change = calculate_log2_fold_change(
+                    baseline_prediction, perturbation_prediction
+                )
+
+                # Store fold change
+                if flag == "TRUE":
+                    true_fold_changes[(enhancer_idx, gene_idx)] = fold_change
+                else:
+                    false_fold_changes[(enhancer_idx, gene_idx)] = fold_change
+
+                # Proceed to delete a random enhancer (control)
+                # Identify eligible random enhancers
+                enhancers_in_subgraph = [
+                    i
+                    for i, orig_idx in enumerate(n_id)
+                    if orig_idx.item() in enhancer_orig_indices
+                ]
+
+                # Exclude the target gene node and the current enhancer
+                excluded_nodes = {target_subgraph_idx, enhancer_subgraph_idx}
+
+                possible_random_enhancers = [
+                    n for n in enhancers_in_subgraph if n not in excluded_nodes
+                ]
+
+                if possible_random_enhancers:
+                    random_node_subgraph_idx = random.choice(possible_random_enhancers)
+                    random_modified_subgraph = delete_node(
+                        sub_data, random_node_subgraph_idx
+                    )
+
+                    # Run inference on randomly modified subgraph
+                    random_evaluator = GNNTrainer(
+                        model=model,
+                        device=device,
+                        data=random_modified_subgraph,
+                    )
+
+                    random_out, _ = random_evaluator.evaluate_single(
+                        data=random_modified_subgraph,
+                        mask="test",
+                    )
+
+                    if random_out.numel() != 1:
+                        print(
+                            f"Unexpected number of outputs after deleting random enhancer {random_node_subgraph_idx} for gene {gene_idx}. Skipping."
+                        )
+                        continue
+
+                    random_prediction = random_out.item()
+                    fold_change_random = calculate_log2_fold_change(
+                        baseline_prediction, random_prediction
+                    )
+
+                    # Store fold change
+                    random_fold_changes[(random_node_subgraph_idx, gene_idx)] = (
+                        fold_change_random
+                    )
+                else:
+                    print(
+                        f"No eligible enhancer nodes available for random deletion in subgraph for gene {gene_idx}."
+                    )
+
+            # Since we're processing all enhancers within this subgraph, break after the first (and only) batch
+            break
+
+    # Save the fold changes
+    with open("true_fc.pkl", "wb") as f:
+        pickle.dump(true_fold_changes, f)
+
+    with open("false_fc.pkl", "wb") as f:
+        pickle.dump(false_fold_changes, f)
+
+    with open("random_fc.pkl", "wb") as f:
+        pickle.dump(random_fold_changes, f)
+
+    print(f"True Fold Changes: {len(true_fold_changes)}")
+    print(f"False Fold Changes: {len(false_fold_changes)}")
+    print(f"Random Fold Changes: {len(random_fold_changes)}")
+
+
+# In [4]: len(true_fold_changes)
+# Out[4]: 613
+
+# In [5]: len(false_fold_changes)
+# Out[5]: 10117
+
+# In [6]: len(random_fold_changes)
+# Out[6]: 11002
+
+# In [7]: len(crispri_links)
+# Out[7]: 12030
 
 
 if __name__ == "__main__":
