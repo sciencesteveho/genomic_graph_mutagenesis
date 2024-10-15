@@ -13,16 +13,30 @@ ANALYSES TO PERFORM
 """
 
 
+import argparse
+from collections import deque
+import json
+import logging
+import math
+from pathlib import Path
 import pickle
 import random
+import time
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import networkx as nx  # type: ignore
 import numpy as np
+import pandas as pd
 import pybedtools
+from scipy import stats  # type: ignore
+from scipy.stats import pearsonr  # type: ignore
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+import torch_geometric  # type: ignore
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import NeighborLoader  # type: ignore
 from torch_geometric.utils import from_networkx  # type: ignore
@@ -30,11 +44,399 @@ from torch_geometric.utils import k_hop_subgraph  # type: ignore
 from torch_geometric.utils import to_networkx  # type: ignore
 from tqdm import tqdm  # type: ignore
 
-from omics_graph_learning.graph_to_pytorch import graph_to_pytorch
-from omics_graph_learning.perturbation.in_silico_perturbation import (
-    InSilicoPerturbation,
-)
-from omics_graph_learning.utils.common import _add_hash_if_missing
+from omics_graph_learning.architecture_builder import build_gnn_architecture
+from omics_graph_learning.combination_loss import RMSEandBCELoss
+
+
+class GNNTrainer:
+    """Class to handle GNN training and evaluation.
+
+    Methods
+    --------
+    train:
+        Train GNN model on graph data via minibatching
+    evaluate:
+        Evaluate GNN model on validation or test set
+    inference_all_neighbors:
+        Evaluate GNN model on test set using all neighbors
+    training_loop:
+        Execute training loop for GNN model
+    log_tensorboard_data:
+        Log data to tensorboard on the last batch of an epoch.
+
+    Examples:
+    --------
+    # instantiate trainer
+    >>> trainer = GNNTrainer(
+            model=model,
+            device=device,
+            data=data,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            logger=logger,
+            tb_logger=tb_logger,
+        )
+
+    # train model
+    >>> model, _, early_stop = trainer.train_model(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            model_dir=run_dir,
+            args=args,
+            min_epochs=min_epochs,
+        )
+    """
+
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        device: torch.device,
+        data: torch_geometric.data.Data,
+        optimizer: Optional[Optimizer] = None,
+        scheduler: Optional[Union[LRScheduler, ReduceLROnPlateau]] = None,
+    ) -> None:
+        """Initialize model trainer."""
+        self.model = model
+        self.device = device
+        self.data = data
+        self.optimizer = optimizer
+        self.scheduler = scheduler
+
+        self.criterion = RMSEandBCELoss(alpha=0.8)
+
+    def _forward_pass(
+        self,
+        data: torch_geometric.data.Data,
+        mask: torch.Tensor,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        """Perform forward pass and compute losses and outputs."""
+        data = data.to(self.device)
+
+        regression_out, logits = self.model(
+            x=data.x,
+            edge_index=data.edge_index,
+            mask=mask,
+        )
+
+        loss, regression_loss, classification_loss = self.criterion(
+            regression_output=regression_out,
+            regression_target=data.y,
+            classification_output=logits,
+            classification_target=data.class_labels,
+            mask=mask,
+        )
+
+        # collect masked outputs and labels
+        regression_out_masked = self._ensure_tensor_dim(regression_out[mask])
+        labels_masked = self._ensure_tensor_dim(data.y[mask])
+
+        classification_out_masked = self._ensure_tensor_dim(logits[mask])
+        class_labels_masked = self._ensure_tensor_dim(data.class_labels[mask])
+
+        return (
+            loss,
+            regression_loss,
+            classification_loss,
+            regression_out_masked,
+            labels_masked,
+            classification_out_masked,
+            class_labels_masked,
+        )
+
+    def _train_single_batch(
+        self,
+        data: torch_geometric.data.Data,
+        epoch: int,
+        batch_idx: int,
+        total_batches: int,
+    ) -> Tuple[float, float, float]:
+        """Train a single batch."""
+        self.optimizer.zero_grad()
+
+        # forward pass
+        mask = data.train_mask_loss
+
+        (
+            loss,
+            regression_loss,
+            classification_loss,
+            _,
+            _,
+            _,
+            _,
+        ) = self._forward_pass(data, mask)
+
+        # backpropagation
+        loss.backward()
+
+        # clip gradients
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+
+        # check for NaN gradients
+        self._check_for_nan_gradients()
+        self.optimizer.step()
+
+        # step warmup schedulers, if applicable
+        if isinstance(self.scheduler, LRScheduler) and not isinstance(
+            self.scheduler, ReduceLROnPlateau
+        ):
+            self.scheduler.step()
+
+        batch_size_mask = int(mask.sum())
+        return (
+            loss.item() * batch_size_mask,
+            regression_loss.item() * batch_size_mask,
+            classification_loss.item() * batch_size_mask,
+        )
+
+    def _evaluate_single_batch(
+        self,
+        data: torch_geometric.data.Data,
+        mask: str,
+    ) -> Tuple[float, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Evaluate a single batch."""
+        mask = getattr(data, f"{mask}_mask_loss")
+        if mask.sum() == 0:
+            return (
+                0.0,
+                torch.tensor([]),
+                torch.tensor([]),
+                torch.tensor([]),
+                torch.tensor([]),
+            )
+        # forward pass
+        (
+            loss,
+            _,
+            _,
+            regression_out_masked,
+            labels_masked,
+            classification_out_masked,
+            class_labels_masked,
+        ) = self._forward_pass(data, mask)
+
+        batch_size_mask = int(mask.sum())
+        return (
+            loss.item() * batch_size_mask,
+            regression_out_masked.cpu(),
+            labels_masked.cpu(),
+            classification_out_masked.cpu(),
+            class_labels_masked.cpu(),
+        )
+
+    def train(
+        self,
+        train_loader: torch_geometric.data.DataLoader,
+        epoch: int,
+        subset_batches: Optional[int] = None,
+    ) -> Tuple[float, float, float]:
+        """Train GNN model on graph data"""
+        self.model.train()
+        pbar = tqdm(total=len(train_loader))
+        pbar.set_description(
+            f"\nTraining {self.model.__class__.__name__} model @ epoch: {epoch} - "
+        )
+
+        total_loss = total_regression = total_classification = float(0)
+        total_examples = 0
+        total_batches = len(train_loader)
+        for batch_idx, data in enumerate(train_loader):
+            if subset_batches and batch_idx >= subset_batches:
+                break
+
+            loss, regression_loss, classification_loss = self._train_single_batch(
+                data=data,
+                epoch=epoch,
+                batch_idx=batch_idx,
+                total_batches=total_batches,
+            )
+            total_loss += loss
+            total_regression += regression_loss
+            total_classification += classification_loss
+            total_examples += int(data.train_mask_loss.sum())
+            pbar.update(1)
+
+        pbar.close()
+        final_loss = total_loss / total_examples if total_examples > 0 else 0.0
+        final_regression = (
+            total_regression / total_examples if total_examples > 0 else 0.0
+        )
+        final_classification = (
+            total_classification / total_examples if total_examples > 0 else 0.0
+        )
+        return final_loss, final_regression, final_classification
+
+    @torch.no_grad()
+    def evaluate(
+        self,
+        data_loader: torch_geometric.data.DataLoader,
+        epoch: int,
+        mask: str,
+        subset_batches: Optional[int] = None,
+    ) -> Tuple[float, float, torch.Tensor, torch.Tensor, float, float]:
+        """Base function for model evaluation or inference."""
+        self.model.eval()
+        pbar = tqdm(total=len(data_loader))
+        pbar.set_description(
+            f"\nEvaluating {self.model.__class__.__name__} model @ epoch: {epoch}"
+        )
+
+        total_loss = float(0)
+        total_examples = 0
+        regression_outs, regression_labels = [], []
+        classification_outs, classification_labels = [], []
+
+        for batch_idx, data in enumerate(data_loader):
+            if subset_batches and batch_idx >= subset_batches:
+                break
+
+            loss, reg_out, reg_label, cls_out, cls_label = self._evaluate_single_batch(
+                data=data,
+                mask=mask,
+            )
+            total_loss += loss
+            total_examples += int(getattr(data, f"{mask}_mask_loss").sum())
+
+            regression_outs.append(reg_out)
+            regression_labels.append(reg_label)
+            classification_outs.append(cls_out)
+            classification_labels.append(cls_label)
+
+            pbar.update(1)
+
+        pbar.close()
+        average_loss = total_loss / total_examples if total_examples > 0 else 0.0
+
+        # compute regression metrics
+        rmse, pearson_r = self._compute_regression_metrics(
+            regression_outs, regression_labels
+        )
+
+        # compute classification metrics
+        accuracy = self._compute_classification_metrics(
+            classification_outs, classification_labels
+        )
+
+        return (
+            average_loss,
+            rmse,
+            torch.cat(regression_outs),
+            torch.cat(regression_labels),
+            pearson_r,
+            accuracy,
+        )
+
+    @staticmethod
+    def _compute_regression_metrics(
+        regression_outs: List[torch.Tensor],
+        regression_labels: List[torch.Tensor],
+    ) -> Tuple[float, float]:
+        """Compute RMSE and Pearson's R for regression task."""
+        if not regression_outs or not regression_labels:
+            return 0.0, 0.0
+
+        predictions = torch.cat(regression_outs).squeeze()
+        targets = torch.cat(regression_labels).squeeze()
+        mse = F.mse_loss(predictions, targets)
+        rmse = torch.sqrt(mse).item()
+        pearson_r, _ = pearsonr(predictions.numpy(), targets.numpy())
+
+        return rmse, pearson_r
+
+    @staticmethod
+    def _compute_classification_metrics(
+        classification_outs: List[torch.Tensor],
+        classification_labels: List[torch.Tensor],
+    ) -> float:
+        """Compute accuracy for classification task."""
+        if not classification_outs or not classification_labels:
+            return 0.0
+
+        logits = torch.cat(classification_outs).squeeze()
+        labels = torch.cat(classification_labels).squeeze()
+        probs = torch.sigmoid(logits)
+        preds = (probs > 0.5).long()
+        return (preds == labels).float().mean().item()
+
+    @staticmethod
+    def _ensure_tensor_dim(tensor: torch.Tensor) -> torch.Tensor:
+        """Ensure tensor has the correct dimensions for evaluation."""
+        tensor = tensor.squeeze()
+        if tensor.dim() == 0:
+            tensor = tensor.unsqueeze(0)
+        return tensor
+
+
+def load_model(
+    checkpoint_file: str,
+    map_location: torch.device,
+    device: torch.device,
+) -> nn.Module:
+    """Load the model from a checkpoint.
+
+    Args:
+        checkpoint_file (str): Path to the model checkpoint file.
+        map_location (str): Map location for loading the model.
+        device (torch.device): Device to load the model onto.
+
+    Returns:
+        nn.Module: The loaded model.
+    """
+    model = build_gnn_architecture(
+        model="GAT",
+        activation="gelu",
+        in_size=44,
+        embedding_size=200,
+        out_channels=1,
+        gnn_layers=2,
+        shared_mlp_layers=2,
+        heads=4,
+        dropout_rate=0.4,
+        residual="distinct_source",
+        attention_task_head=False,
+        train_dataset=None,
+    )
+    model = model.to(device)
+
+    # load the model
+    checkpoint = torch.load(checkpoint_file, map_location=map_location)
+    model.load_state_dict(checkpoint, strict=False)
+    model.eval()
+    return model
+
+
+def load_graph(
+    graph_path: str, graph_idxs_path: str, pyg_graph: str
+) -> Tuple[Data, Dict[str, int]]:
+    """Load the graph and its indices from pickle files.
+
+    Args:
+        graph_path (str): Path to the graph data file.
+        graph_idxs_path (str): Path to the graph indices file.
+
+    Returns:
+        Tuple[Data, Dict[str, int]]: The graph data and index mapping.
+    """
+    with open(graph_path, "rb") as file:
+        graph = pickle.load(file)
+
+    with open(graph_idxs_path, "rb") as file:
+        graph_idxs = pickle.load(file)
+
+    with open(pyg_graph, "rb") as file:
+        pyg = pickle.load(file)
+
+    return graph, graph_idxs, pyg
 
 
 def calculate_fold_change(
@@ -57,8 +459,16 @@ def get_subgraph(data: Data, graph: nx.Graph, target_node: int) -> Data:
         Data: A new PyG Data object containing the subgraph for the connected
         component.
     """
+    # make a copy of graph to avoid modifying the original
+    extract_graph = graph.copy()
+
+    # make a mask for the target node
+    mask = torch.zeros(data.num_nodes, dtype=torch.bool)
+    mask[target_node] = True
+    extract_graph.mask = mask
+
     # find the connected component containing the target node
-    for component in nx.connected_components(graph):
+    for component in nx.connected_components(extract_graph):
         if target_node in component:
             subgraph_nodes = component
             break
@@ -72,6 +482,9 @@ def get_subgraph(data: Data, graph: nx.Graph, target_node: int) -> Data:
     # copy node features and labels from the original graph
     sub_data.x = data.x[list(subgraph_nodes)]
     sub_data.y = data.y[list(subgraph_nodes)]
+
+    # inherit mask
+    sub_data.test_mask_loss = mask[list(subgraph_nodes)]
 
     return sub_data
 
@@ -245,21 +658,41 @@ def perturb_crispri(
     raise NotImplementedError
 
 
+def make_loader(
+    data: Data,
+) -> NeighborLoader:
+    """Make a neighbor loader for the data."""
+    return NeighborLoader(
+        data,
+        num_neighbors=[-1],  # all neighbors at each hop
+        batch_size=1,
+        shuffle=False,
+    )
+
+
 def main() -> None:
+    """Try and see if we can recpitulate crispr stuff man."""
+    # set device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.manual_seed(126)
+
     # load graph
     crispr_benchmarks = "EPCrisprBenchmark_ensemble_data_GRCh38.tsv"
     enhancer_catalogue = "enhancers_epimap_screen_overlap.bed"
+    idx_file = "regulatory_only_k562_allcontacts_global_full_graph_idxs.pkl"
 
+    # load the pytorch graph
     graph = torch.load("graph.pt")
 
     # create nx graph
     nx_graph = to_networkx(graph, to_undirected=True)
 
     # load IDXS
-    with open(
-        "../regulatory_only_k562_combinedloopcallers_full_graph_idxs.pkl", "rb"
-    ) as f:
+    with open(idx_file, "rb") as f:
         idxs = pickle.load(f)
+
+    # load the model
+    model = load_model("GAT_best_model.pt", device, device)
 
     # load crispr benchmarks
     crispri_links = load_crispri(crispr_benchmarks, enhancer_catalogue)
@@ -270,8 +703,10 @@ def main() -> None:
     renamed_crispri_links = {link for link in renamed_crispri_links if link is not None}
 
     # filter the links for present nodes in the graph
-    crispri_links = filter_links_for_present_nodes(graph, renamed_crispri_links)
-    crispri_links = create_crispri_dict(crispri_links)
+    crispri_test = filter_links_for_present_nodes(
+        graph, renamed_crispri_links
+    )  # 11,147 E_G pairs
+    crispri_test = create_crispri_dict(crispri_test)  # 1,868 genes
 
     # Some for testing:
     (487024, 11855, "FALSE"),
@@ -285,33 +720,64 @@ def main() -> None:
     (320736, 10356, "TRUE"),
 
     # get the subgraph
-    subgraph = get_subgraph(graph, nx_graph, 11855)
+    # test = get_subgraph(graph, nx_graph, 11855)
 
-    # start loop for eval
-    # load the model
-    model = load_model(checkpoint_file, map_location, device)
+    # for each loop,
+    # get subgraph
+    # run baseline inference on subgraph
+    # delete target node
+    # run new inference on subgraph
+    # calculate fold change
+    # delete random node
+    # run new inference on subgraph
+    # calculate fold change
+    # save crispri dictionary with key (element, gene) value fold_change
 
     # iterate over crispri links
+    # remember (idx, gene, flag)
+    crispr_link = (242639, 106, "TRUE")
     for crispr_link in crispri_links:
-        # get the subgraph
-        # run a function given
 
-        # get the data object
-        data = Data(
-            x=subgraph.x,
-            edge_index=subgraph.edge_index,
-            edge_attr=subgraph.edge_attr,
-            y=subgraph.y,
+        # get subgraph
+        subgraph = get_subgraph(graph, nx_graph, crispr_link[1])
+
+        # init evaluator
+        evaluator = GNNTrainer(
+            model=model,
+            device=device,
+            data=subgraph,
         )
 
-        # get the loader
-        loader = NeighborLoader(data, size=100, num_workers=4)
+        # get loader
+        loader = make_loader(subgraph)
 
-        # get the prediction
-        prediction = evaluate(model, loader, device)
+        # get baseline prediction
+        _, _, out, label, _, _ = evaluator.evaluate(
+            data_loader=loader,
+            mask="test",
+            epoch=0,
+        )
 
-        # save the prediction
-        save_prediction(prediction, crispr_link, output_file)
+        #
+
+    # loss, rmse, outs, labels, pearson_r, accuracy = post_eval_trainer.evaluate(
+    #     data_loader=data_loader,
+    #     mask="test",
+    #     epoch=0,
+    # )
+
+    # # save final eval
+    # np.save(run_dir / "outs.npy", outs.numpy())
+    # np.save(run_dir / "labels.npy", labels.numpy())
+    # for step, (out, label) in enumerate(zip(outs, labels)):
+    #     tb_logger.writer.add_scalar("Predictions", out.item(), step)
+    #     tb_logger.writer.add_scalar("Labels", label.item(), step)
+
+    # # bootstrap evaluation
+    # mean_correlation, ci_lower, ci_upper = bootstrap_evaluation(
+    #     predictions=outs,
+    #     labels=labels,
+    # )
 
 
 if __name__ == "__main__":
