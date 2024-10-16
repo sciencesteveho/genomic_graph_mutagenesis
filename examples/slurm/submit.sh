@@ -125,9 +125,9 @@ for config in "${configs[@]}"; do
     --scheduler cosine \
     --dropout 0.5 \
     --residual distinct_source \
-    --heads 4 \
+    --heads 2 \
     --positional_encoding \
-    --model_name regulatory_only_k562_allcontacts_global_gat_2layers_128dim_4attnheads_highdrop
+    --model_name regulatory_only_k562_allcontacts_global_gat_2layers_128dim_2attnheads_highdrop
 done
 
 configs=(k562_allcontacts_global.yaml)
@@ -147,9 +147,9 @@ for config in "${configs[@]}"; do
     --scheduler cosine \
     --dropout 0.3 \
     --residual distinct_source \
-    --heads 4 \
+    --heads 2 \
     --positional_encoding \
-    --model_name regulatory_only_k562_allcontacts_global_unimp_2layers_128dim_4attnheads
+    --model_name regulatory_only_k562_allcontacts_global_unimp_2layers_128dim_2attnheads
 done
 
 configs=(k562_allcontacts_global.yaml)
@@ -169,10 +169,10 @@ for config in "${configs[@]}"; do
     --scheduler cosine \
     --dropout 0.3 \
     --residual distinct_source \
-    --heads 4 \
+    --heads 2 \
     --positional_encoding \
     --attention_task_head \
-    --model_name regulatory_only_k562_allcontacts_global_gat_2layers_128dim_4attnheads_attntask
+    --model_name regulatory_only_k562_allcontacts_global_gat_2layers_128dim_2attnheads_attntask
 done
 
 configs=(k562_allcontacts_global.yaml)
@@ -182,10 +182,10 @@ for config in "${configs[@]}"; do
     --experiment_yaml ogl/configs/experiments/"${config}" \
     --target rna_seq \
     --model GAT \
-    --gnn_layers 4 \
+    --gnn_layers 2 \
     --linear_layers 2 \
     --activation gelu \
-    --dimensions 128 \
+    --dimensions 32 \
     --batch_size 64 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
@@ -194,7 +194,7 @@ for config in "${configs[@]}"; do
     --residual distinct_source \
     --heads 4 \
     --positional_encoding \
-    --model_name regulatory_only_k562_allcontacts_global_gat_4layers_128dim_4attnheads
+    --model_name regulatory_only_k562_allcontacts_global_gat_2layers_32dim_4attnheads
 done
 
 
