@@ -54,7 +54,7 @@ class AttentionTaskHead(nn.Module):
     Attributes:
         embedding_size: hidden size
         out_channels: output size (probably 1)
-        num_heads: number of attention heads (default: `4`)
+        num_heads: number of attention heads (default: `2`)
         dropout_rate: % neurons to drop out (default: `0.1`)
     """
 
@@ -62,7 +62,7 @@ class AttentionTaskHead(nn.Module):
         self,
         embedding_size: int,
         out_channels: int,
-        num_heads: int = 4,
+        num_heads: int = 2,
         dropout_rate: float = 0.1,
     ) -> None:
         """Initialize an MLP with multiheaded attention."""

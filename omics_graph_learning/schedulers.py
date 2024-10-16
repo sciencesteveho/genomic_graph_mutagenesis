@@ -100,7 +100,7 @@ class OptimizerSchedulerHandler:
             return torch.optim.AdamW(
                 model_params,
                 lr=learning_rate,
-                weight_decay=0.012,
+                weight_decay=0.02,
             )
         raise ValueError(f"Unsupported optimizer: {optimizer_type}")
 
