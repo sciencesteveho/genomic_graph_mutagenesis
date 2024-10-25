@@ -28,7 +28,7 @@ from torch_geometric.loader import NeighborLoader  # type: ignore
 from tqdm import tqdm  # type: ignore
 
 from omics_graph_learning.architecture_builder import build_gnn_architecture
-from omics_graph_learning.combination_loss import RMSEandBCELoss
+from omics_graph_learning.combination_loss import CombinationLoss
 from omics_graph_learning.graph_to_pytorch import GraphToPytorch
 from omics_graph_learning.perturbation.perturb_graph import PerturbationConfig
 from omics_graph_learning.schedulers import OptimizerSchedulerHandler
@@ -42,8 +42,7 @@ from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.constants import EARLY_STOP_PATIENCE
 from omics_graph_learning.utils.constants import RANDOM_SEEDS
 from omics_graph_learning.utils.tb_logger import TensorBoardLogger
-from omics_graph_learning.visualization.training import \
-    plot_predicted_versus_expected
+from omics_graph_learning.visualization.training import plot_predicted_versus_expected
 from omics_graph_learning.visualization.training import plot_training_losses
 
 
@@ -93,6 +92,7 @@ class GNNTrainer:
         model: torch.nn.Module,
         device: torch.device,
         data: torch_geometric.data.Data,
+        regression_loss_type: Optional[str] = "rmse",
         optimizer: Optional[Optimizer] = None,
         scheduler: Optional[Union[LRScheduler, ReduceLROnPlateau]] = None,
         logger: Optional[logging.Logger] = None,
@@ -102,12 +102,15 @@ class GNNTrainer:
         self.model = model
         self.device = device
         self.data = data
+        self.regression_loss_type = regression_loss_type
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.logger = logger
         self.tb_logger = tb_logger
 
-        self.criterion = RMSEandBCELoss(alpha=0.8)
+        self.criterion = CombinationLoss(
+            alpha=0.85, regression_loss_type=regression_loss_type
+        )
 
     def _forward_pass(
         self,
@@ -618,6 +621,7 @@ def post_model_evaluation(
     model: torch.nn.Module,
     device: torch.device,
     data: torch_geometric.data.Data,
+    regression_loss_type: str,
     data_loader: torch_geometric.data.DataLoader,
     tb_logger: TensorBoardLogger,
     logger: logging.Logger,
@@ -644,6 +648,7 @@ def post_model_evaluation(
         model=model,
         device=device,
         data=data,
+        regression_loss_type=regression_loss_type,
         logger=logger,
         tb_logger=tb_logger,
     )
@@ -888,6 +893,7 @@ def main() -> None:
         model=model,
         device=device,
         data=data,
+        regression_loss_type=args.regression_loss_type,
         optimizer=optimizer,
         scheduler=scheduler,
         logger=logger,
@@ -918,6 +924,7 @@ def main() -> None:
         model=model,
         device=device,
         data=data,
+        regression_loss_type=args.regression_loss_type,
         data_loader=test_loader,
         tb_logger=tb_logger,
         logger=logger,

@@ -242,6 +242,7 @@ class PipelineRunner:
             f"--learning_rate {args.learning_rate} "
             f"--optimizer {args.optimizer} "
             f"--scheduler {args.scheduler} "
+            f"--regression_loss_type {args.regression_loss_type} "
             f"--dropout {args.dropout} "
             f"--split_name {split_name} "
             f"--run_number {run_number} "

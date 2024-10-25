@@ -224,6 +224,7 @@ function _cpg_islands () {
 # =============================================================================
 # Parser to split reference repeatmasker calls into LINE, LTR, SINE, and RNA
 # repeat files. (LTR includes retroposons)
+# https://repeatmasker.org/genomes/hg38/RepeatMasker-rm405-db20140131/hg38.fa.out.gz
 # =============================================================================
 function _repeatmasker () {
     local unprocessed_dir=$1

@@ -280,50 +280,50 @@ class EdgeParser:
                         "mirna",
                     )
 
-    def _tf_markers(
-        self,
-        interaction_file: str,
-    ) -> Generator[Tuple[str, str, str], None, None]:
-        """Filters tf markers based on specified conditions.
+    # def _tf_markers(
+    #     self,
+    #     interaction_file: str,
+    # ) -> Generator[Tuple[str, str, str], None, None]:
+    #     """Filters tf markers based on specified conditions.
 
-        Args:
-            interaction_file (str): The path to the interaction file.
+    #     Args:
+    #         interaction_file (str): The path to the interaction file.
 
-        Returns:
-            List[Tuple[str, str]]: A list of filtered tf marker interactions.
-        """
-        tf_keep = ["TF", "I Marker", "TFMarker"]
-        with open(interaction_file, newline="") as file:
-            reader = csv.reader(file, delimiter="\t")
-            next(reader)  # skip header
+    #     Returns:
+    #         List[Tuple[str, str]]: A list of filtered tf marker interactions.
+    #     """
+    #     tf_keep = ["TF", "I Marker", "TFMarker"]
+    #     with open(interaction_file, newline="") as file:
+    #         reader = csv.reader(file, delimiter="\t")
+    #         next(reader)  # skip header
 
-            tf_markers = []
-            for line in reader:
-                if line[2] in tf_keep and line[5] == self.marker_name:
-                    with contextlib.suppress(IndexError):
-                        if ";" in line[10]:
-                            genes = line[10].split(";")
-                            for gene in genes:
-                                if line[2] == "I Marker":
-                                    tf_markers.append((gene, line[1]))
-                                else:
-                                    tf_markers.append((line[1], gene))
-                        elif line[2] == "I Marker":
-                            tf_markers.append((line[10], line[1]))
-                        else:
-                            tf_markers.append((line[1], line[10]))
+    #         tf_markers = []
+    #         for line in reader:
+    #             if line[2] in tf_keep and line[5] == self.marker_name:
+    #                 with contextlib.suppress(IndexError):
+    #                     if ";" in line[10]:
+    #                         genes = line[10].split(";")
+    #                         for gene in genes:
+    #                             if line[2] == "I Marker":
+    #                                 tf_markers.append((gene, line[1]))
+    #                             else:
+    #                                 tf_markers.append((line[1], gene))
+    #                     elif line[2] == "I Marker":
+    #                         tf_markers.append((line[10], line[1]))
+    #                     else:
+    #                         tf_markers.append((line[1], line[10]))
 
-        for tup in tf_markers:
-            if (
-                tup[0] in self.genesymbol_to_gencode.keys()
-                and tup[1] in self.genesymbol_to_gencode.keys()
-            ):
-                yield (
-                    f"{self.genesymbol_to_gencode[tup[0]]}{self.tf_extension}",
-                    self.genesymbol_to_gencode[tup[1]],
-                    # -1,
-                    "tf_marker",
-                )
+    #     for tup in tf_markers:
+    #         if (
+    #             tup[0] in self.genesymbol_to_gencode.keys()
+    #             and tup[1] in self.genesymbol_to_gencode.keys()
+    #         ):
+    #             yield (
+    #                 f"{self.genesymbol_to_gencode[tup[0]]}{self.tf_extension}",
+    #                 self.genesymbol_to_gencode[tup[1]],
+    #                 # -1,
+    #                 "tf_marker",
+    #             )
 
     def _tfbinding_footprints(
         self,
@@ -384,9 +384,7 @@ class EdgeParser:
 
     def _prepare_interaction_generators(self):
         """Initiate interaction type generators"""
-        ppi_generator = mirna_generator = tf_generator = circuit_generator = (
-            tfbinding_generator
-        ) = iter([])
+        mirna_generator = tf_generator = tfbinding_generator = iter([])
 
         if "mirna" in self.interaction_types:
             mirna_generator = self._mirna_targets(
@@ -394,31 +392,19 @@ class EdgeParser:
                 tissue_active_mirnas=self.interaction_dir
                 / self.interaction_files["mirdip"],
             )
-        if "tf_marker" in self.interaction_types:
-            tf_generator = self._tf_markers(
-                interaction_file=self.interaction_dir
-                / self.interaction_files["tf_marker"],
-            )
         if "tfbinding" in self.interaction_types:
             tfbinding_generator = self._tfbinding_footprints(
                 tfbinding_file=self.shared_interaction_dir
                 / self.interaction_files["tfbinding"],
                 footprint_file=self.local_dir / self.shared["footprints"],
             )
-        # if "ppis" in self.interaction_types:
-        #     ppi_generator = self._iid_ppi(
-        #         interaction_file=f"{self.interaction_dir}/{self.interaction_files['ppis']}",
-        #         tissue=self.ppi_tissue,
-        #     )
-        # if "circuits" in self.interaction_types:
-        #     circuit_generator = self._marbach_regulatory_circuits(
-        #         f"{self.interaction_dir}/{self.interaction_files['circuits']}",
-        #         score_filter=30,
+        # if "tf_marker" in self.interaction_types:
+        #     tf_generator = self._tf_markers(
+        #         interaction_file=self.interaction_dir
+        #         / self.interaction_files["tf_marker"],
         #     )
 
         return (
-            # ppi_generator,
-            # mirna_generator,
             tf_generator,
             circuit_generator,
             tfbinding_generator,

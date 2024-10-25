@@ -2,14 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-"""Code to evaluate in-silico perturbations matching CRISPRi experiments in
-K562.
-
-ANALYSES TO PERFORM
-# 1 - we expect the tuples with TRUE to have a higher magnitude of change than random perturbations
-# 2 - for each tuple, we expect those with TRUE to affect prediction at a higher magnitude than FALSE
-# 3 - for each tuple, we expect those with TRUE to negatively affect prediction (recall)
-# 3 - for the above, compare the change that randomly chosen FALSE would postively or negatively affect the prediction
+"""Deletion of lethal genes.
 """
 
 
@@ -395,31 +388,36 @@ def main() -> None:
     torch.manual_seed(126)
 
     # gencode to symbol
-    lookup_file = "../gencode_to_genesymbol_lookup_table.txt"
+    lookup_file = "gencode_to_genesymbol_lookup_table.txt"
     gencode_to_symbol = load_gencode_lookup(lookup_file)
 
     # load lethal genes
+    lethal_file = "/ocean/projects/bio210019p/stevesho/data/preprocess/recapitulations/lethal_genes_blomen.txt"
+    with open(lethal_file, "r") as f:
+        lethal_gene_symbols = [line.strip() for line in f]
+
+    lethal_gencode = [
+        gencode_to_symbol[gene]
+        for gene in lethal_gene_symbols
+        if gene in gencode_to_symbol
+    ]
 
     # Load graph
-    idx_file = "regulatory_only_h1_esc_allcontacts_global_full_graph_idxs.pkl"
-
-    # Load the PyTorch graph
-    data = torch.load("h1.pt")
-    data = data.to(device)
-
-    # Create NetworkX graph
-    nx_graph = to_networkx(data, to_undirected=True)
-
-    # Load indices
+    idx_file = "regulatory_only_k562_allcontacts_global_full_graph_idxs.pkl"
     with open(idx_file, "rb") as f:
         idxs = pickle.load(f)
 
+    lethal_gencode = [
+        f"{gene}_k562" for gene in lethal_gencode if f"{gene}_k562" in idxs
+    ]
+    lethal_idxs = [idxs[gene] for gene in lethal_gencode if gene in idxs]
+
+    # Load the PyTorch graph
+    data = torch.load("graph.pt")
+    data = data.to(device)
+
     # Get dictionaries of gene indices
     gene_idxs = {k: v for k, v in idxs.items() if "ENSG" in k}
-
-    # Map node indices to gene IDs
-    node_idx_to_gene_id = {v: k for k, v in gene_idxs.items()}
-    gene_indices = list(gene_idxs.values())
 
     # Load the model
     model = load_model("GAT_best_model.pt", device, device)
@@ -430,13 +428,12 @@ def main() -> None:
         device=device,
         data=data,
     )
-
     # Combine masks for all nodes
     data.all_mask = data.test_mask | data.train_mask | data.val_mask
     data.all_mask_loss = data.test_mask_loss | data.train_mask_loss | data.val_mask_loss
 
-    # Use NeighborLoader for the test set
-    test_loader = NeighborLoader(
+    # Create the all_loader
+    all_loader = NeighborLoader(
         data,
         num_neighbors=[data.avg_edges] * 2,
         batch_size=64,
@@ -444,9 +441,9 @@ def main() -> None:
         shuffle=False,
     )
 
-    # Evaluate the model on the test set
+    # Evaluate the model on the all_loader to get baseline predictions
     regression_outs, regression_labels, node_indices = trainer.evaluate(
-        data_loader=test_loader,
+        data_loader=all_loader,
         epoch=0,
         mask="all",
     )
@@ -456,119 +453,144 @@ def main() -> None:
     regression_labels = regression_labels.squeeze()
     node_indices = node_indices.squeeze()
 
-    # Verify that the lengths match
-    assert (
-        regression_outs.shape[0] == regression_labels.shape[0] == node_indices.shape[0]
-    ), "Mismatch in tensor lengths."
-
-    # Create a DataFrame to keep track of node indices, predictions, and labels
-    df = pd.DataFrame(
+    # Create a DataFrame to keep track of node indices and predictions
+    baseline_df = pd.DataFrame(
         {
             "node_idx": node_indices.cpu().numpy(),
             "prediction": regression_outs.cpu().numpy(),
-            "label": regression_labels.cpu().numpy(),
         }
     )
 
-    # Filter for gene nodes
-    gene_node_indices = set(gene_indices)
-    df_genes = df[df["node_idx"].isin(gene_node_indices)].copy()
+    # Get the list of non-essential genes
+    all_gene_ids = list(gene_idxs.keys())
+    non_essential_gene_ids = list(set(all_gene_ids) - set(lethal_gencode))
 
-    # Map node indices to gene IDs
-    df_genes["gene_id"] = df_genes["node_idx"].map(node_idx_to_gene_id)
+    # Run experiments for essential genes
+    essential_fold_changes = []
 
-    # Compute absolute differences
-    df_genes["diff"] = (df_genes["prediction"] - df_genes["label"]).abs()
+    for run in range(20):
+        print(f"Essential genes experiment run {run+1}")
+        # Randomly select 100 essential genes
+        selected_essential_node_indices = random.sample(lethal_idxs, 100)
 
-    # Filter genes with predicted output > 5
-    df_genes_filtered = df_genes[df_genes["prediction"] > 5]
+        # Create a copy of data.x
+        x_perturbed = data.x.clone()
 
-    # Check if there are enough genes after filtering
-    if df_genes_filtered.empty:
-        print("No gene predictions greater than 5 found.")
+        # Zero out the node features of the selected essential genes
+        x_perturbed[selected_essential_node_indices] = 0
 
-    # Select top 25 genes with the smallest difference
-    topk = min(100, len(df_genes_filtered))
-    df_top100 = df_genes_filtered.nsmallest(topk, "diff")
+        # Create data_perturbed
+        data_perturbed = data.clone()
+        data_perturbed.x = x_perturbed
 
-    # Get top 25 gene IDs
-    top100_gene_ids = df_top100["gene_id"].tolist()
+        # Ensure masks are carried over
+        data_perturbed.all_mask = data.all_mask
+        data_perturbed.all_mask_loss = data.all_mask_loss
 
-    # Save baseline predictions to a file
-    baseline_predictions = dict(zip(df_genes["gene_id"], df_genes["prediction"]))
-    with open("baseline_predictions_all.pkl", "wb") as f:
-        pickle.dump(baseline_predictions, f)
+        # Create perturbed_loader
+        perturbed_loader = NeighborLoader(
+            data_perturbed,
+            num_neighbors=[data.avg_edges] * 2,
+            batch_size=64,
+            input_nodes=getattr(data_perturbed, "all_mask"),
+            shuffle=False,
+        )
 
-    # Save top 25 gene IDs to a file
-    with open("top100_gene_ids_all.pkl", "wb") as f:
-        pickle.dump(top100_gene_ids, f)
+        # Evaluate the model on the perturbed data
+        regression_outs_perturbed, _, node_indices_perturbed = trainer.evaluate(
+            data_loader=perturbed_loader,
+            epoch=0,
+            mask="all",
+        )
 
-    # save dataframe
-    df_top100.to_csv("top100_gene_predictions_all.csv", index=False)
+        # Create perturbed DataFrame
+        perturbed_df = pd.DataFrame(
+            {
+                "node_idx": node_indices_perturbed.cpu().numpy(),
+                "prediction_perturbed": regression_outs_perturbed.cpu().numpy(),
+            }
+        )
 
-    # Task 2: Zero out node features (moved up)
-    # Get baseline predictions on the test set
-    feature_cumulative_differences = defaultdict(list)
-    feature_indices = list(range(5, 42))
+        # Merge baseline and perturbed DataFrames
+        merged_df = baseline_df.merge(perturbed_df, on="node_idx")
 
-    # Use NeighborLoader to load the test data in batches
-    test_loader = NeighborLoader(
-        data,
-        num_neighbors=[data.avg_edges] * 2,
-        batch_size=64,
-        input_nodes=getattr(data, "all_mask"),
-        shuffle=False,
-    )
+        # Compute difference
+        merged_df["diff"] = merged_df["prediction"] - merged_df["prediction_perturbed"]
 
-    # Iterate over the test batches
-    for batch in tqdm(test_loader, desc="Processing Test Batches for Task 2"):
-        batch = batch.to(device)
-        mask = batch.all_mask_loss
+        # Compute average fold change
+        average_fold_change = merged_df["diff"].mean()
 
-        if mask.sum() == 0:
-            continue
+        essential_fold_changes.append(average_fold_change)
 
-        # Get baseline predictions for this batch
-        with torch.no_grad():
-            regression_out_baseline, _ = model(
-                x=batch.x,
-                edge_index=batch.edge_index,
-                mask=mask,
-            )
-            regression_out_baseline = regression_out_baseline[mask].cpu()
+    # Save the fold change results
+    with open("essential_fold_changes.pkl", "wb") as f:
+        pickle.dump(essential_fold_changes, f)
 
-        # For each feature to perturb
-        for feature_index in feature_indices:
-            # Create a copy of the node features and zero out the feature at feature_index
-            x_perturbed = batch.x.clone()
-            x_perturbed[:, feature_index] = 0
+    # Run experiments for non-essential genes
+    non_essential_fold_changes = []
 
-            # Perform inference with perturbed features
-            with torch.no_grad():
-                regression_out_perturbed, _ = model(
-                    x=x_perturbed,
-                    edge_index=batch.edge_index,
-                    mask=mask,
-                )
-                regression_out_perturbed = regression_out_perturbed[mask].cpu()
+    for run in range(20):
+        print(f"Non-essential genes experiment run {run+1}")
+        # Randomly select 100 non-essential genes
+        selected_non_essential_genes = random.sample(non_essential_gene_ids, 100)
+        # Get their node indices
+        selected_non_essential_node_indices = [
+            gene_idxs[gene_id]
+            for gene_id in selected_non_essential_genes
+            if gene_id in gene_idxs
+        ]
 
-            # Compute difference between baseline and perturbed predictions for test nodes
-            diff = torch.abs(regression_out_baseline - regression_out_perturbed)
+        # Create a copy of data.x
+        x_perturbed = data.x.clone()
 
-            # Accumulate differences
-            feature_cumulative_differences[feature_index].append(diff)
+        # Zero out the node features of the selected non-essential genes
+        x_perturbed[selected_non_essential_node_indices] = 0
 
-    # After processing all batches, compute average differences for each feature
-    feature_fold_changes = {}
-    for feature_index in feature_indices:
-        diffs = torch.cat(feature_cumulative_differences[feature_index])
-        avg_distance = torch.mean(diffs).item()
-        feature_fold_changes[feature_index] = avg_distance
+        # Create data_perturbed
+        data_perturbed = data.clone()
+        data_perturbed.x = x_perturbed
 
-    # Save the feature fold changes to a file
-    with open("feature_fold_changes_all.pkl", "wb") as f:
-        pickle.dump(feature_fold_changes, f)
+        # Ensure masks are carried over
+        data_perturbed.all_mask = data.all_mask
+        data_perturbed.all_mask_loss = data.all_mask_loss
 
+        # Create perturbed_loader
+        perturbed_loader = NeighborLoader(
+            data_perturbed,
+            num_neighbors=[data.avg_edges] * 2,
+            batch_size=64,
+            input_nodes=getattr(data_perturbed, "all_mask"),
+            shuffle=False,
+        )
 
-if __name__ == "__main__":
-    main()
+        # Evaluate the model on the perturbed data
+        regression_outs_perturbed, _, node_indices_perturbed = trainer.evaluate(
+            data_loader=perturbed_loader,
+            epoch=0,
+            mask="all",
+        )
+
+        # Create perturbed DataFrame
+        perturbed_df = pd.DataFrame(
+            {
+                "node_idx": node_indices_perturbed.cpu().numpy(),
+                "prediction_perturbed": regression_outs_perturbed.cpu().numpy(),
+            }
+        )
+
+        # Merge baseline and perturbed DataFrames
+        merged_df = baseline_df.merge(perturbed_df, on="node_idx")
+
+        # Compute difference
+        merged_df["diff"] = merged_df["prediction"] - merged_df["prediction_perturbed"]
+
+        # Compute average fold change
+        average_fold_change = merged_df["diff"].mean()
+
+        non_essential_fold_changes.append(average_fold_change)
+
+    with open("non_essential_fold_changes.pkl", "wb") as f:
+        pickle.dump(non_essential_fold_changes, f)
+
+    print(f"Essential fold changes: {essential_fold_changes}")
+    print(f"Non-essential fold changes: {non_essential_fold_changes}")

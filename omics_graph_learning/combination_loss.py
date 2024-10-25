@@ -12,13 +12,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class RMSEandBCELoss(nn.Module):
-    """Custom loss function combining Root Mean Squared Error (RMSE) for
-    regression and Binary Cross-Entropy Loss (BCE) for classification tasks for
-    OGL.
+class CombinationLoss(nn.Module):
+    """Custom loss function combining eithing root mean squared error (RMSE) or
+    smooth L1 loss for regression and binary cross-entropy loss (BCE) for
+    classification.
 
     Attributes:
-        alpha: (float) weighting factor for the primary task (default: 0.8)
+        alpha (float): weighting factor for the primary task (default: 0.85)
+        regression_loss_type (str): type of regression loss (default: 'rmse')
 
     Methods
     --------
@@ -27,7 +28,7 @@ class RMSEandBCELoss(nn.Module):
 
     Examples:
     --------
-    # Initialize custom loss >>> criterion = RMSEandBCELoss(alpha=0.8)
+    # Initialize custom loss >>> criterion = RMSEandBCELoss(alpha=alpha)
 
     # Compute the loss and backpropagate >>> loss = criterion(
         regression_output=regression_output,
@@ -38,12 +39,19 @@ class RMSEandBCELoss(nn.Module):
     >>> optimizer.step()
     """
 
-    def __init__(self, alpha=0.85) -> None:
+    def __init__(self, alpha=0.85, regression_loss_type: str = "rmse") -> None:
         """Initialize the custom loss function."""
-        super(RMSEandBCELoss, self).__init__()
+        super(CombinationLoss, self).__init__()
         if not (0.0 <= alpha <= 1.0):
             raise ValueError("alpha must be between 0 and 1.")
         self.alpha = alpha
+
+        if regression_loss_type in {"rmse", "smooth_l1"}:
+            self.regression_loss_type = regression_loss_type
+        else:
+            raise ValueError(
+                "regression_loss_type must be either 'rmse' or 'smooth_l1'."
+            )
 
     def forward(
         self,
@@ -53,8 +61,8 @@ class RMSEandBCELoss(nn.Module):
         classification_target: torch.Tensor,
         mask: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Compute the weighted combination loss via weighted sum of RMSE and
-        BCE.
+        """Computed the weighted combination loss via weighted sum of the
+        regression and classification tasks.
         """
         regression_loss = self.compute_regression_loss(
             regression_output=regression_output,
@@ -78,20 +86,28 @@ class RMSEandBCELoss(nn.Module):
         """Compute the combined loss."""
         return self.alpha * regression_loss + (1 - self.alpha) * classification_loss
 
-    @staticmethod
     def compute_regression_loss(
+        self,
         regression_output: torch.Tensor,
         regression_target: torch.Tensor,
         mask: torch.Tensor,
     ) -> torch.Tensor:
-        """Compute the regression loss (root mean-square error)."""
+        """Compute the regression loss (root mean-square error or smooth l1)."""
         if mask.sum() <= 0:
             return torch.tensor(0.0, device=regression_output.device)
 
-        mse = F.mse_loss(
-            regression_output[mask].squeeze(), regression_target[mask].squeeze()
-        )
-        return torch.sqrt(mse)
+        masked_output = regression_output[mask].squeeze()
+        masked_target = regression_target[mask].squeeze()
+
+        if self.regression_loss_type == "rmse":
+            mse = F.mse_loss(masked_output, masked_target)
+            return torch.sqrt(mse)
+        elif self.regression_loss_type == "smooth_l1":
+            return F.smooth_l1_loss(masked_output, masked_target)
+        else:
+            raise ValueError(
+                f"Unsupported regression type: {self.regression_loss_type}"
+            )
 
     @staticmethod
     def compute_classification_loss(

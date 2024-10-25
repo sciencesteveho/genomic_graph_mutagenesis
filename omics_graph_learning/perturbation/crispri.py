@@ -45,7 +45,7 @@ from torch_geometric.utils import to_networkx  # type: ignore
 from tqdm import tqdm  # type: ignore
 
 from omics_graph_learning.architecture_builder import build_gnn_architecture
-from omics_graph_learning.combination_loss import RMSEandBCELoss
+from omics_graph_learning.combination_loss import CombinationLoss
 
 
 class GNNTrainer:
@@ -104,7 +104,7 @@ class GNNTrainer:
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-        self.criterion = RMSEandBCELoss(alpha=0.8)
+        self.criterion = CombinationLoss(alpha=0.8)
 
     def _forward_pass(
         self,

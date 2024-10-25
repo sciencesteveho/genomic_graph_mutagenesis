@@ -166,6 +166,12 @@ class OGLCLIParser:
             default="plateau",
             choices=["plateau", "cosine", "linear_warmup"],
         )
+        self.parser.add_argument(
+            "--regression_loss_type",
+            type=str,
+            default="rmse",
+            choices=["rmse", "smooth_l1"],
+        )
         self.parser.add_argument("--dropout", type=float, default=0.1)
         self.parser.add_argument("--heads", type=int, default=None)
         self.parser.add_argument("--n_trials", type=int)

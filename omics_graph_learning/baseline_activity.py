@@ -4,6 +4,13 @@
 
 """Baseline predictors to compare against the performance of the GNN model.
 
+Cell line baseline:
+    Expression values for cell lines across replicates are log2 transformed
+    (+0.25 pseudocount). We then take the average (mean) log2 TPM of each gene.
+    As a baseline, we use this average to predict the expression for our K562
+    regression targets.
+
+Below is DEPRECATED:
 The first predictor is based on a random assignment of activity, from a
 distribution of expression activity across all tissues in GTEx. The second is
 based on the average activity of that specific gene across all samples adapted
