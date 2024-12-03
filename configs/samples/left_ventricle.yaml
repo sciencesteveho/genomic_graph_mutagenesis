@@ -80,4 +80,4 @@ tissue_specific_nodes:
   super_enhancer: SE_00_0014_SE_hg38.bed
   tads: VentricleLeft_STL003_Leung_2015-raw_TADs.txt
   tf_binding: interval.all.fps.0.0001.bed
-  loops: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/processed_loops/combinedloopcaller/left_ventricle_loops.bedpe
+  loops: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/processed_loops/combinedloopcallers/left_ventricle_loops.bedpe
