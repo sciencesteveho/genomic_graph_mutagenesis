@@ -5,22 +5,19 @@
 """Inference runner for perturbation experiments."""
 
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch_geometric  # type: ignore
+from torch_geometric.utils import subgraph  # type: ignore
 from tqdm import tqdm  # type: ignore
 
 from omics_graph_learning.architecture_builder import build_gnn_architecture
 from omics_graph_learning.combination_loss import CombinationLoss
 
 
-class PerturbationRunner:
+class PerturbRunner:
     """Class to handle GNN model inference for perturbation experiments.
 
     Methods
@@ -125,13 +122,13 @@ class PerturbationRunner:
                   predictions.
         """
         self.model.eval()
+        regression_outs, regression_labels = [], []
+        node_indices = []
+
         pbar = tqdm(total=len(data_loader))
         pbar.set_description(
             f"Evaluating {self.model.__class__.__name__} model @ epoch: {epoch}"
         )
-
-        regression_outs, regression_labels = [], []
-        node_indices = []
 
         for batch_idx, data in enumerate(data_loader):
             if subset_batches and batch_idx >= subset_batches:
@@ -140,24 +137,24 @@ class PerturbationRunner:
             data = data.to(self.device)
             mask_tensor = getattr(data, f"{mask}_mask_loss")
 
-            # Skip batches with no nodes in the mask
+            # skip batches with no nodes in the mask
             if mask_tensor.sum() == 0:
                 pbar.update(1)
                 continue
 
-            # Forward pass
+            # forward pass
             regression_out, _ = self.model(
                 x=data.x,
                 edge_index=data.edge_index,
                 mask=mask_tensor,
             )
 
-            # Collect masked outputs and labels
+            # collect masked outputs and labels
             regression_out_masked = regression_out[mask_tensor]
             labels_masked = data.y[mask_tensor]
             batch_node_indices = data.n_id[mask_tensor].cpu()
 
-            # Ensure tensors are at least one-dimensional
+            # ensure tensors are at least one-dimensional
             if regression_out_masked.dim() == 0:
                 regression_out_masked = regression_out_masked.unsqueeze(0)
                 labels_masked = labels_masked.unsqueeze(0)
@@ -168,7 +165,6 @@ class PerturbationRunner:
             node_indices.append(batch_node_indices)
 
             pbar.update(1)
-
         pbar.close()
 
         if regression_outs:
@@ -209,11 +205,86 @@ class PerturbationRunner:
 
         return regression_out_masked.cpu(), labels_masked.cpu()
 
-    @staticmethod
+    @torch.no_grad()
+    def infer_subgraph(
+        self,
+        sub_data: torch_geometric.data.Data,
+        mask_attr: str,
+    ) -> torch.Tensor:
+        """Perform inference on a subgraph."""
+        sub_data = sub_data.to(self.device)
+        mask = getattr(sub_data, f"{mask_attr}_mask_loss")
+
+        regression_out, _ = self.model(
+            x=sub_data.x,
+            edge_index=sub_data.edge_index,
+            mask=mask,
+        )
+        return regression_out
+
+    @torch.no_grad()
+    def infer_perturbed_subgraph(
+        self,
+        sub_data: torch_geometric.data.Data,
+        node_to_remove_idx: int,
+        mask_attr: str,
+    ) -> Tuple[torch.Tensor, Optional[int]]:
+        """Perform inference on a perturbed subgraph with a node removed."""
+        # mask = all nodes except the node to remove
+        mask_nodes = (
+            torch.arange(sub_data.num_nodes, device=self.device) != node_to_remove_idx
+        )
+
+        # get subgraph with node removed
+        perturbed_edge_index, _, _ = subgraph(
+            subset=mask_nodes,
+            edge_index=sub_data.edge_index,
+            relabel_nodes=True,
+            num_nodes=sub_data.num_nodes,
+            return_edge_mask=True,
+        )
+
+        # get copy feats and mask to perturbed subgraph
+        perturbed_x = sub_data.x[mask_nodes]
+        perturbed_mask = getattr(sub_data, mask_attr)[mask_nodes]
+        perturbed_n_id = sub_data.n_id[mask_nodes]
+
+        # ensure gene_node is still in the perturbed subgraph
+        if (perturbed_n_id == sub_data.n_id[node_to_remove_idx]).sum() == 0:
+            print(
+                f"Gene node not in perturbed subgraph: {sub_data.n_id[node_to_remove_idx]}"
+            )
+            return None, None
+
+        # find the new index of the target node after reindexing
+        idx_in_perturbed = (
+            (perturbed_n_id == sub_data.n_id[node_to_remove_idx])
+            .nonzero(as_tuple=True)[0]
+            .item()
+        )
+
+        # inference
+        regression_out, _ = self.model(
+            x=perturbed_x,
+            edge_index=perturbed_edge_index,
+            mask=perturbed_mask,
+        )
+        return regression_out, idx_in_perturbed
+
     def load_model(
+        self,
         checkpoint_file: str,
         map_location: torch.device,
-        device: torch.device,
+        model: str,
+        activation: str,
+        in_size: int,
+        embedding_size: int,
+        gnn_layers: int,
+        shared_mlp_layers: int,
+        heads: int,
+        dropout_rate: float,
+        residual: str,
+        attention_task_head: bool,
     ) -> nn.Module:
         """Load the model from a checkpoint.
 
@@ -226,20 +297,20 @@ class PerturbationRunner:
             nn.Module: The loaded model.
         """
         model = build_gnn_architecture(
-            model="GAT",
-            activation="gelu",
-            in_size=44,
-            embedding_size=200,
+            model=model,
+            activation=activation,
+            in_size=in_size,
+            embedding_size=embedding_size,
             out_channels=1,
-            gnn_layers=2,
-            shared_mlp_layers=2,
-            heads=4,
-            dropout_rate=0.4,
-            residual="distinct_source",
-            attention_task_head=False,
+            gnn_layers=gnn_layers,
+            shared_mlp_layers=shared_mlp_layers,
+            heads=heads,
+            dropout_rate=dropout_rate,
+            residual=residual,
+            attention_task_head=attention_task_head,
             train_dataset=None,
         )
-        model = model.to(device)
+        model = model.to(self.device)
 
         # load the model
         checkpoint = torch.load(checkpoint_file, map_location=map_location)
