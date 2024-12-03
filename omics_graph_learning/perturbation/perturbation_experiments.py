@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple
 
 import networkx as nx  # type: ignore
 import pandas as pd
+from scipy.stats import ttest_ind  # type: ignore
 import torch
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import NeighborLoader  # type: ignore
@@ -56,7 +57,13 @@ def load_data_and_model(
     model_file: str,
     device: torch.device,
 ) -> Tuple[
-    Data, PerturbRunner, Dict[int, str], List[int], Dict[int, str], Dict[str, int]
+    Data,
+    PerturbRunner,
+    Dict[int, str],
+    List[int],
+    Dict[int, str],
+    Dict[str, int],
+    Dict[str, str],
 ]:
     """Load data and model for perturbation experiments."""
     # load gencode to symbol lookup, pytorch graph, and indices
@@ -80,7 +87,15 @@ def load_data_and_model(
         data=data,
     )
 
-    return data, runner, node_idx_to_gene_id, gene_indices, idxs_inv, idxs
+    return (
+        data,
+        runner,
+        node_idx_to_gene_id,
+        gene_indices,
+        idxs_inv,
+        idxs,
+        gencode_to_symbol,
+    )
 
 
 def load_coessential_pairs(
@@ -164,10 +179,13 @@ def get_best_predictions(
     topk: int = 100,
     prediction_threshold: float = 5.0,
     output_prefix: str = "",
+    gencode_to_symbol: Dict[str, str] = None,
 ) -> List[int]:
-    """Compute absolute differences and save a specific top k of best
+    """compute differences and save a specific top k of best
     predictions past a TPM threshold.
     """
+    if gencode_to_symbol is None:
+        gencode_to_symbol = {}
     # filter for gene nodes
     gene_node_indices = set(gene_indices)
     df_genes = df[df["node_idx"].isin(gene_node_indices)].copy()
@@ -175,8 +193,8 @@ def get_best_predictions(
     # map node indices to gene IDs
     df_genes["gene_id"] = df_genes["node_idx"].map(node_idx_to_gene_id)
 
-    # compute absolute differences
-    df_genes["diff"] = (df_genes["prediction"] - df_genes["label"]).abs()
+    # compute differences without absolute value
+    df_genes["diff"] = df_genes["prediction"] - df_genes["label"]
 
     # filter genes with predicted output > prediction_threshold
     df_genes_filtered = df_genes[df_genes["prediction"] > prediction_threshold]
@@ -186,38 +204,47 @@ def get_best_predictions(
         print(f"No gene predictions greater than {prediction_threshold} found.")
         return []
 
-    # select topk genes with the smallest difference
+    # select topk genes with the largest absolute difference
     topk = min(topk, len(df_genes_filtered))
-    df_topk = df_genes_filtered.nsmallest(topk, "diff")
+    df_topk = df_genes_filtered.reindex(
+        df_genes_filtered["diff"].abs().sort_values(ascending=False).index
+    ).head(topk)
 
-    # get topk gene IDs
+    # get topk gene IDs and their corresponding node indices
     topk_gene_ids = df_topk["gene_id"].tolist()
     topk_node_indices = df_topk["node_idx"].tolist()
 
-    # save baseline predictions to a file
-    baseline_predictions = dict(zip(df_genes["gene_id"], df_genes["prediction"]))
-    with open(f"{output_prefix}baseline_predictions.pkl", "wb") as f:
-        pickle.dump(baseline_predictions, f)
+    # map node indices to gene symbols
+    topk_gene_names = []
+    for node_idx in topk_node_indices:
+        gene_id = node_idx_to_gene_id.get(node_idx)
+        if gene_id and "ENSG" in gene_id:
+            if gene_symbol := gencode_to_symbol.get(gene_id.split("_")[0]):
+                topk_gene_names.append(gene_symbol)
+            else:
+                topk_gene_names.append(gene_id)
+        else:
+            topk_gene_names.append(str(node_idx))
 
-    # save topk gene IDs to a file
-    with open(f"{output_prefix}top{topk}_gene_ids.pkl", "wb") as f:
-        pickle.dump(topk_gene_ids, f)
-
-    # save dataframe
-    df_topk.to_csv(f"{output_prefix}top{topk}_gene_predictions.csv", index=False)
+    # save topk gene names to a file
+    with open(f"{output_prefix}top{topk}_gene_names.txt", "w") as f:
+        for gene in topk_gene_names:
+            f.write(f"{gene}\n")
 
     return topk_node_indices
 
 
-def perturb_graph_features(
+def perturb_node_features(
     data: Data,
     runner: PerturbRunner,
     feature_indices: List[int],
     mask: str,
     device: torch.device,
+    node_idx_to_gene_id: Dict[int, str],
+    gencode_to_symbol: Dict[str, str],
     output_prefix: str = "",
 ) -> None:
-    """Perform absolute feature perturbation and compute differences."""
+    """perform feature perturbation, compute differences, and save top affected genes."""
     feature_cumulative_differences = defaultdict(list)
 
     # use NeighborLoader to load the test data in batches
@@ -248,6 +275,8 @@ def perturb_graph_features(
             )
             regression_out_baseline = regression_out_baseline[mask_tensor].cpu()
 
+        node_indices = batch.n_id[mask_tensor].cpu()
+
         # for each feature to perturb
         for feature_index in feature_indices:
             # create a copy of the node features and zero out the feature at feature_index
@@ -264,17 +293,45 @@ def perturb_graph_features(
                 regression_out_perturbed = regression_out_perturbed[mask_tensor].cpu()
 
             # compute difference between baseline and perturbed predictions for test nodes
-            diff = torch.abs(regression_out_baseline - regression_out_perturbed)
+            diff = regression_out_baseline - regression_out_perturbed  # preserve sign
 
-            # accumulate differences
-            feature_cumulative_differences[feature_index].append(diff)
+            # accumulate differences with node indices
+            for idx, d in zip(node_indices, diff):
+                feature_cumulative_differences[feature_index].append(
+                    (idx.item(), d.item())
+                )
 
     # after processing all batches, compute average differences for each feature
     feature_fold_changes = {}
     for feature_index in feature_indices:
-        diffs = torch.cat(feature_cumulative_differences[feature_index])
-        avg_distance = torch.mean(diffs).item()
+        diffs = [d for idx, d in feature_cumulative_differences[feature_index]]
+        avg_distance = sum(diffs) / len(diffs)
         feature_fold_changes[feature_index] = avg_distance
+
+        # get top 100 genes most affected by the feature ablation
+        sorted_diffs = sorted(
+            feature_cumulative_differences[feature_index],
+            key=lambda x: abs(x[1]),
+            reverse=True,
+        )
+        top_100 = sorted_diffs[:100]
+        top_100_gene_names = []
+        for node_idx, diff_value in top_100:
+            # map node_idx to gene_id
+            gene_id = node_idx_to_gene_id.get(node_idx)
+            if gene_id and "ENSG" in gene_id:
+                if gene_symbol := gencode_to_symbol.get(gene_id.split("_")[0]):
+                    top_100_gene_names.append((gene_symbol, diff_value))
+                else:
+                    top_100_gene_names.append((gene_id, diff_value))
+            else:
+                top_100_gene_names.append((str(node_idx), diff_value))
+
+        # save top 100 gene names for this feature
+        with open(
+            f"{output_prefix}feature_{feature_index}_top100_genes.pkl", "wb"
+        ) as f:
+            pickle.dump(top_100_gene_names, f)
 
     # save the feature fold changes to a file
     with open(f"{output_prefix}feature_fold_changes.pkl", "wb") as f:
@@ -689,10 +746,14 @@ def main() -> None:
     torch.manual_seed(126)
 
     # specify files and parameters
-    lookup_file = "../gencode_to_genesymbol_lookup_table.txt"
+
+    # user specified
+    model_file = "/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads/run_1/GAT_best_model.pt"
+    idx_file = "/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/experiments/regulatory_only_k562_allcontacts_global/graphs/tpm_0.5_samples_0.1_test_8-9_val_10_rna_seq/regulatory_only_k562_allcontacts_global_full_graph_idxs.pkl"
     graph_file = "h1.pt"
-    idx_file = "regulatory_only_h1_esc_allcontacts_global_full_graph_idxs.pkl"
-    model_file = "GAT_best_model.pt"
+
+    # other files and params
+    lookup_file = "/ocean/projects/bio210019p/stevesho/data/preprocess/recapitulations/crispri/gencode_to_genesymbol_lookup_table.txt"
     mask = "all"
     output_prefix = "all_"
     topk = 100
@@ -700,15 +761,21 @@ def main() -> None:
     feature_indices = list(range(5, 42))
     num_hops = 6
     max_nodes_to_perturb = 100
-    num_runs = 10  # Number of runs for essential/non-essential perturbation
+    num_runs = 10  # number of runs for essential/non-essential perturbation
 
     # load data and model
-    data, runner, node_idx_to_gene_id, gene_indices, idxs_inv, idxs = (
-        load_data_and_model(lookup_file, graph_file, idx_file, model_file, device)
-    )
+    (
+        data,
+        runner,
+        node_idx_to_gene_id,
+        gene_indices,
+        idxs_inv,
+        idxs,
+        gencode_to_symbol,
+    ) = load_data_and_model(lookup_file, graph_file, idx_file, model_file, device)
 
     # evaluate the model
-    df = get_baseline_predictions(data, runner, mask, device)
+    df = get_baseline_predictions(data, runner, mask)
 
     # process predictions and save results
     top_gene_nodes = get_best_predictions(
@@ -720,7 +787,16 @@ def main() -> None:
         return
 
     # Run Experiment 1: Feature perturbation
-    perturb_graph_features(data, runner, feature_indices, mask, device, output_prefix)
+    perturb_node_features(
+        data,
+        runner,
+        feature_indices,
+        mask,
+        device,
+        node_idx_to_gene_id,
+        gencode_to_symbol,
+        output_prefix,
+    )
 
     # Run Experiment 2: Connected component perturbation
     gene_fold_changes = perturb_connected_components(
@@ -759,6 +835,33 @@ def main() -> None:
 
     print(f"Essential fold changes: {essential_fold_changes}")
     print(f"Non-essential fold changes: {nonessential_fold_changes}")
+
+    # Run Experiment 4: Coessential pair perturbation
+    pos_pairs_file = "/path/to/coessential_gencode_named_pos.txt"
+    neg_pairs_file = "/path/to/coessential_gencode_named_neg.txt"
+
+    pos_pairs, neg_pairs = load_coessential_pairs(pos_pairs_file, neg_pairs_file, idxs)
+
+    # Perturb positive coessential pairs
+    coessential_changes, random_changes = perturb_coessential_pairs(
+        data,
+        runner,
+        pos_pairs,
+        idxs_inv,
+        mask_attr=mask,
+        num_hops=num_hops,
+        output_prefix=f"{output_prefix}coessential_pos_",
+    )
+
+    t_stat, p_value = ttest_ind(coessential_changes, random_changes, equal_var=False)
+    print("T-test results for positive coessential pairs vs random perturbations:")
+    print(f"T-statistic: {t_stat}, P-value: {p_value}")
+
+    # You can repeat the same for negative coessential pairs if needed
+
+    # Optionally, save the statistical results
+    with open(f"{output_prefix}coessential_stats.txt", "w") as f:
+        f.write(f"T-statistic: {t_stat}, P-value: {p_value}\n")
 
 
 if __name__ == "__main__":
