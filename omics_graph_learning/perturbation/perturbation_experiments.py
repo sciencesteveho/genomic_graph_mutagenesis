@@ -14,7 +14,7 @@
 from collections import defaultdict
 import pickle
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import networkx as nx  # type: ignore
 import pandas as pd
@@ -81,6 +81,36 @@ def load_data_and_model(
     )
 
     return data, runner, node_idx_to_gene_id, gene_indices, idxs_inv, idxs
+
+
+def load_coessential_pairs(
+    pos_file: str, neg_file: str, idxs: Dict[str, int]
+) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+    """Load positive and negative coessential gene pairs and map to node indices."""
+    pos_pairs = []
+    neg_pairs = []
+
+    # Load positive pairs
+    with open(pos_file, "r") as f:
+        for line in f:
+            gene1, gene2, label = line.strip().split("\t")
+            if label != "pos":
+                continue
+            # Map to indices
+            if gene1 in idxs and gene2 in idxs:
+                pos_pairs.append((idxs[gene1], idxs[gene2]))
+
+    # Load negative pairs
+    with open(neg_file, "r") as f:
+        for line in f:
+            gene1, gene2, label = line.strip().split("\t")
+            if label != "neg":
+                continue
+            # Map to indices
+            if gene1 in idxs and gene2 in idxs:
+                neg_pairs.append((idxs[gene1], idxs[gene2]))
+
+    return pos_pairs, neg_pairs
 
 
 def get_baseline_predictions(
@@ -368,6 +398,290 @@ def perturb_connected_components(
     return gene_fold_changes
 
 
+def perturb_specific_nodes(
+    data: Data,
+    runner: PerturbRunner,
+    node_indices_to_perturb: List[int],
+    device: torch.device,
+    num_runs: int = 20,
+    output_prefix: str = "",
+) -> List[float]:
+    """Zero out the node features of specified nodes and compute average fold
+    change.
+    """
+    fold_changes = []
+
+    # all node mask
+    data = data.to(device)
+    data = combine_masks(data)
+    data.all_mask_loss = data.test_mask_loss | data.train_mask_loss | data.val_mask_loss
+
+    # all node loader
+    all_loader = NeighborLoader(
+        data,
+        num_neighbors=[data.avg_edges] * 2,
+        batch_size=64,
+        input_nodes=getattr(data, "all_mask"),
+        shuffle=False,
+    )
+
+    # evaluate the model on the all_loader to get baseline predictions
+    regression_outs, regression_labels, node_indices = runner.evaluate(
+        data_loader=all_loader,
+        epoch=0,
+        mask="all",
+    )
+
+    # ensure tensors are one-dimensional
+    regression_outs = regression_outs.squeeze()
+    node_indices = node_indices.squeeze()
+
+    # create a DataFrame to keep track of node indices and predictions
+    baseline_df = pd.DataFrame(
+        {
+            "node_idx": node_indices.cpu().numpy(),
+            "prediction": regression_outs.cpu().numpy(),
+        }
+    )
+
+    for run in range(num_runs):
+        print(f"Perturbation experiment run {run+1}")
+        # randomly select 100 nodes from node_indices_to_perturb
+        selected_node_indices = random.sample(node_indices_to_perturb, 100)
+
+        # create a copy of data.x
+        x_perturbed = data.x.clone()
+
+        # zero out the node features of the selected nodes
+        x_perturbed[selected_node_indices] = 0
+
+        # create data_perturbed
+        data_perturbed = data.clone()
+        data_perturbed.x = x_perturbed
+
+        # ensure masks are carried over
+        data_perturbed.all_mask = data.all_mask
+        data_perturbed.all_mask_loss = data.all_mask_loss
+
+        # create perturbed_loader
+        perturbed_loader = NeighborLoader(
+            data_perturbed,
+            num_neighbors=[data.avg_edges] * 2,
+            batch_size=64,
+            input_nodes=getattr(data_perturbed, "all_mask"),
+            shuffle=False,
+        )
+
+        # evaluate the model on the perturbed data
+        regression_outs_perturbed, _, node_indices_perturbed = runner.evaluate(
+            data_loader=perturbed_loader,
+            epoch=0,
+            mask="all",
+        )
+
+        # create perturbed DataFrame
+        perturbed_df = pd.DataFrame(
+            {
+                "node_idx": node_indices_perturbed.cpu().numpy(),
+                "prediction_perturbed": regression_outs_perturbed.cpu().numpy(),
+            }
+        )
+
+        # merge baseline and perturbed DataFrames
+        merged_df = baseline_df.merge(perturbed_df, on="node_idx")
+
+        # compute difference
+        merged_df["diff"] = merged_df["prediction"] - merged_df["prediction_perturbed"]
+
+        # compute average fold change
+        average_fold_change = merged_df["diff"].mean()
+
+        fold_changes.append(average_fold_change)
+
+    # save the fold change results
+    with open(f"{output_prefix}fold_changes.pkl", "wb") as f:
+        pickle.dump(fold_changes, f)
+
+    return fold_changes
+
+
+def essential_gene_perturbation(
+    data: Data,
+    runner: PerturbRunner,
+    idxs: Dict[str, int],
+    gencode_to_symbol: Dict[str, str],
+    output_prefix: str = "",
+    num_runs: int = 20,
+) -> List[float]:
+    """Perform perturbation experiments on essential genes."""
+    # load lethal genes
+    lethal_file = "/path/to/lethal_genes.txt"
+    with open(lethal_file, "r") as f:
+        lethal_gene_symbols = [line.strip() for line in f]
+
+    # map gene symbols to Gencode IDs
+    lethal_gencode = [
+        gencode_to_symbol[gene]
+        for gene in lethal_gene_symbols
+        if gene in gencode_to_symbol
+    ]
+
+    # append cell type suffix and get indices
+    lethal_gencode = [
+        f"{gene}_k562" for gene in lethal_gencode if f"{gene}_k562" in idxs
+    ]
+    lethal_idxs = [idxs[gene] for gene in lethal_gencode if gene in idxs]
+
+    return perturb_specific_nodes(
+        data=data,
+        runner=runner,
+        node_indices_to_perturb=lethal_idxs,
+        mask="all",
+        device=runner.device,
+        num_runs=num_runs,
+        output_prefix=f"{output_prefix}essential_",
+    )
+
+
+def nonessential_gene_perturbation(
+    data: Data,
+    runner: PerturbRunner,
+    idxs: Dict[str, int],
+    gencode_to_symbol: Dict[str, str],
+    output_prefix: str = "",
+    num_runs: int = 20,
+) -> List[float]:
+    """Perform perturbation experiments on non-essential genes."""
+    # load lethal genes
+    lethal_file = "/path/to/lethal_genes.txt"
+    with open(lethal_file, "r") as f:
+        lethal_gene_symbols = [line.strip() for line in f]
+
+    # map gene symbols to Gencode IDs
+    lethal_gencode = [
+        gencode_to_symbol[gene]
+        for gene in lethal_gene_symbols
+        if gene in gencode_to_symbol
+    ]
+
+    # append cell type suffix and get indices
+    lethal_gencode = [
+        f"{gene}_k562" for gene in lethal_gencode if f"{gene}_k562" in idxs
+    ]
+
+    # get all gene indices
+    gene_idxs = {k: v for k, v in idxs.items() if "ENSG" in k}
+    all_gene_ids = list(gene_idxs.keys())
+
+    # get non-essential gene IDs and indices
+    non_essential_gene_ids = list(set(all_gene_ids) - set(lethal_gencode))
+    non_essential_idxs = [idxs[gene] for gene in non_essential_gene_ids if gene in idxs]
+
+    return perturb_specific_nodes(
+        data=data,
+        runner=runner,
+        node_indices_to_perturb=non_essential_idxs,
+        mask="all",
+        device=runner.device,
+        num_runs=num_runs,
+        output_prefix=f"{output_prefix}nonessential_",
+    )
+
+
+def perturb_coessential_pairs(
+    data: Data,
+    runner: PerturbRunner,
+    coessential_pairs: List[Tuple[int, int]],
+    idxs_inv: Dict[int, str],
+    mask_attr: str = "all",
+    num_hops: int = 6,
+    output_prefix: str = "",
+) -> List[float]:
+    """Perturb coessential pairs and compare with random gene perturbations."""
+    coessential_changes = []
+    random_changes = []
+
+    for gene1_idx, gene2_idx in tqdm(
+        coessential_pairs, desc="Processing Coessential Pairs"
+    ):
+        gene1_id = idxs_inv.get(gene1_idx, str(gene1_idx))
+        gene2_id = idxs_inv.get(gene2_idx, str(gene2_idx))
+
+        # Use NeighborLoader to get a subgraph around gene1
+        num_neighbors = [13] * num_hops
+        loader = NeighborLoader(
+            data,
+            num_neighbors=num_neighbors,
+            batch_size=1,
+            input_nodes=torch.tensor([gene1_idx], dtype=torch.long),
+            shuffle=False,
+        )
+
+        # Get the subgraph (only one batch)
+        sub_data = next(iter(loader))
+        sub_data = sub_data.to(runner.device)
+
+        # Check if gene2 is in the subgraph
+        if (sub_data.n_id == gene2_idx).sum() == 0:
+            continue  # Skip if gene2 is not in subgraph
+
+        # Get index of gene1 in subgraph
+        idx_gene1_in_subgraph = (
+            (sub_data.n_id == gene1_idx).nonzero(as_tuple=True)[0].item()
+        )
+        idx_gene2_in_subgraph = (
+            (sub_data.n_id == gene2_idx).nonzero(as_tuple=True)[0].item()
+        )
+
+        # Get baseline prediction for gene1
+        regression_out_sub = runner.infer_subgraph(sub_data, mask_attr)
+        baseline_prediction = regression_out_sub[idx_gene1_in_subgraph].item()
+
+        # Perturbation: Delete gene2
+        result = runner.infer_perturbed_subgraph(
+            sub_data, idx_gene2_in_subgraph, mask_attr
+        )
+        if result[0] is None:
+            continue  # Skip if gene1 is not in perturbed subgraph
+        regression_out_perturbed, idx_in_perturbed = result
+        perturbation_prediction = regression_out_perturbed[idx_in_perturbed].item()
+
+        # Compute change in expression
+        change = baseline_prediction - perturbation_prediction
+        coessential_changes.append(change)
+
+        # Perturbation: Delete a random gene (not gene1 or gene2)
+        other_nodes = [
+            i
+            for i in range(sub_data.num_nodes)
+            if i not in [idx_gene1_in_subgraph, idx_gene2_in_subgraph]
+        ]
+        if not other_nodes:
+            continue  # No other nodes to perturb
+
+        random_node_idx = random.choice(other_nodes)
+        result = runner.infer_perturbed_subgraph(sub_data, random_node_idx, mask_attr)
+        if result[0] is None:
+            continue  # Skip if gene1 is not in perturbed subgraph
+        regression_out_random_perturbed, idx_in_random_perturbed = result
+        perturbation_prediction_random = regression_out_random_perturbed[
+            idx_in_random_perturbed
+        ].item()
+
+        # Compute change in expression
+        random_change = baseline_prediction - perturbation_prediction_random
+        random_changes.append(random_change)
+
+    # Save changes to files
+    with open(f"{output_prefix}coessential_changes.pkl", "wb") as f:
+        pickle.dump(coessential_changes, f)
+
+    with open(f"{output_prefix}random_changes.pkl", "wb") as f:
+        pickle.dump(random_changes, f)
+
+    return coessential_changes, random_changes
+
+
 def main() -> None:
     """Run perturbation experiments."""
     # set device
@@ -386,6 +700,7 @@ def main() -> None:
     feature_indices = list(range(5, 42))
     num_hops = 6
     max_nodes_to_perturb = 100
+    num_runs = 10  # Number of runs for essential/non-essential perturbation
 
     # load data and model
     data, runner, node_idx_to_gene_id, gene_indices, idxs_inv, idxs = (
@@ -404,24 +719,46 @@ def main() -> None:
         print("No top genes found. Exiting.")
         return
 
-    # run perturbation Experiment One: perturb features
+    # Run Experiment 1: Feature perturbation
     perturb_graph_features(data, runner, feature_indices, mask, device, output_prefix)
 
-    # run perturbation Experiment Two: perturb connected components
+    # Run Experiment 2: Connected component perturbation
     gene_fold_changes = perturb_connected_components(
         data,
         runner,
         top_gene_nodes,
-        idxs,
         idxs_inv,
         num_hops=num_hops,
         max_nodes_to_perturb=max_nodes_to_perturb,
         mask_attr=mask,
     )
 
-    # save the fold changes to a file
+    # Save the fold changes to a file
     with open(f"{output_prefix}gene_fold_changes.pkl", "wb") as f:
         pickle.dump(gene_fold_changes, f)
+
+    # Run Experiment 3A: Essential gene perturbation
+    essential_fold_changes = essential_gene_perturbation(
+        data,
+        runner,
+        idxs,
+        gencode_to_symbol,
+        output_prefix=output_prefix,
+        num_runs=num_runs,
+    )
+
+    # Run Experiment 3B: Non-essential gene perturbation
+    nonessential_fold_changes = nonessential_gene_perturbation(
+        data,
+        runner,
+        idxs,
+        gencode_to_symbol,
+        output_prefix=output_prefix,
+        num_runs=num_runs,
+    )
+
+    print(f"Essential fold changes: {essential_fold_changes}")
+    print(f"Non-essential fold changes: {nonessential_fold_changes}")
 
 
 if __name__ == "__main__":
