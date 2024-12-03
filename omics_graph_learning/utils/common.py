@@ -546,6 +546,9 @@ def _get_chromatin_loop_file(
         file = f"{prefix}{suffix}"
         if os.path.isfile(file):
             return file
+        file = tissue_config.tissue_specific_nodes.loops
+        if os.path.isfile(file):
+            return file
     raise FileNotFoundError(
         f"Loop file not found for {tissue_config.resources['tissue']}"
     )
