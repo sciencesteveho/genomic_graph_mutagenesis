@@ -45,7 +45,8 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 
 # re-run all non k562 models, and try running new tissue models
-for sample in gm12878 hepg2 h1_esc imr90 hmec nhek aorta hippocampus left_ventricle liver lung mammary pancreas skeletal_muscle skin small_intestine; do
+# for sample in gm12878 hepg2 h1_esc imr90 hmec nhek aorta hippocampus left_ventricle liver lung mammary pancreas skeletal_muscle skin small_intestine; do
+for sample in aorta hippocampus left_ventricle liver lung mammary pancreas skeletal_muscle skin small_intestine; do
   config=("${sample}_allcontacts_global.yaml")
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \

@@ -242,9 +242,7 @@ class TargetAssembler:
 
     def _load_tpm_median_df(self) -> pd.DataFrame:
         """Load the GTEx median GCT."""
-        return parse(
-            self.experiment_config.training_targets.expression_median_matrix
-        ).data_df
+        return parse(self.experiment_config.expression_median_matrix).data_df
 
     def _load_protein_abundance_tissue_matrix(
         self, tissue_names: List[str]
