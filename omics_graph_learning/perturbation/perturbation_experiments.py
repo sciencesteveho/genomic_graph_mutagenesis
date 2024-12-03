@@ -188,7 +188,9 @@ def perturb_graph_features(
     output_prefix: str = "",
 ) -> None:
     """Perform absolute feature perturbation and compute differences."""
-    # Use NeighborLoader to load the test data in batches
+    feature_cumulative_differences = defaultdict(list)
+
+    # use NeighborLoader to load the test data in batches
     test_loader = NeighborLoader(
         data,
         num_neighbors=[data.avg_edges] * 2,
@@ -197,9 +199,7 @@ def perturb_graph_features(
         shuffle=False,
     )
 
-    feature_cumulative_differences = defaultdict(list)
-
-    # Iterate over the test batches
+    # iterate over the test batches
     for batch in tqdm(
         test_loader, desc="Processing Test Batches for Feature Perturbation"
     ):
@@ -209,7 +209,7 @@ def perturb_graph_features(
         if mask_tensor.sum() == 0:
             continue
 
-        # Get baseline predictions for this batch
+        # get baseline predictions for this batch
         with torch.no_grad():
             regression_out_baseline, _ = runner.model(
                 x=batch.x,
@@ -218,13 +218,13 @@ def perturb_graph_features(
             )
             regression_out_baseline = regression_out_baseline[mask_tensor].cpu()
 
-        # For each feature to perturb
+        # for each feature to perturb
         for feature_index in feature_indices:
-            # Create a copy of the node features and zero out the feature at feature_index
+            # create a copy of the node features and zero out the feature at feature_index
             x_perturbed = batch.x.clone()
             x_perturbed[:, feature_index] = 0
 
-            # Perform inference with perturbed features
+            # perform inference with perturbed features
             with torch.no_grad():
                 regression_out_perturbed, _ = runner.model(
                     x=x_perturbed,
@@ -233,20 +233,20 @@ def perturb_graph_features(
                 )
                 regression_out_perturbed = regression_out_perturbed[mask_tensor].cpu()
 
-            # Compute difference between baseline and perturbed predictions for test nodes
+            # compute difference between baseline and perturbed predictions for test nodes
             diff = torch.abs(regression_out_baseline - regression_out_perturbed)
 
-            # Accumulate differences
+            # accumulate differences
             feature_cumulative_differences[feature_index].append(diff)
 
-    # After processing all batches, compute average differences for each feature
+    # after processing all batches, compute average differences for each feature
     feature_fold_changes = {}
     for feature_index in feature_indices:
         diffs = torch.cat(feature_cumulative_differences[feature_index])
         avg_distance = torch.mean(diffs).item()
         feature_fold_changes[feature_index] = avg_distance
 
-    # Save the feature fold changes to a file
+    # save the feature fold changes to a file
     with open(f"{output_prefix}feature_fold_changes.pkl", "wb") as f:
         pickle.dump(feature_fold_changes, f)
 
@@ -255,19 +255,18 @@ def perturb_connected_components(
     data: Data,
     runner: PerturbRunner,
     top_gene_nodes: List[int],
-    idxs: Dict[str, int],
     idxs_inv: Dict[int, str],
     num_hops: int = 6,
     max_nodes_to_perturb: int = 100,
     mask_attr: str = "all",
 ) -> Dict[str, Dict[str, Any]]:
-    """Perturb connected components and compute fold changes."""
+    """Perturb connected components node-by-node and compute fold changes."""
     gene_fold_changes = {}
 
     for gene_node in tqdm(top_gene_nodes, desc="Processing Genes for Perturbation"):
         gene_id = idxs_inv.get(gene_node, str(gene_node))
 
-        # Use NeighborLoader to get a subgraph around the gene node
+        # use NeighborLoader to get a subgraph around the gene node
         num_neighbors = [13] * num_hops
         loader = NeighborLoader(
             data,
@@ -277,19 +276,19 @@ def perturb_connected_components(
             shuffle=False,
         )
 
-        # Get the subgraph (only one batch since batch_size=1 and one input node)
+        # get the subgraph (only one batch since batch_size=1 and one input node)
         sub_data = next(iter(loader))
         sub_data = sub_data.to(runner.device)
 
-        # Get index of gene_node in subgraph
+        # get index of gene_node in subgraph
         idx_in_subgraph = (sub_data.n_id == gene_node).nonzero(as_tuple=True)[0].item()
 
-        # Get baseline prediction for the gene in the subgraph
+        # get baseline prediction for the gene in the subgraph
         regression_out_sub = runner.infer_subgraph(sub_data, mask_attr)
         baseline_prediction = regression_out_sub[idx_in_subgraph].item()
         print(f"Baseline prediction for gene {gene_id}: {baseline_prediction}")
 
-        # Get nodes to perturb (excluding the gene node)
+        # get nodes to perturb (excluding the gene node)
         nodes_to_perturb = sub_data.n_id[sub_data.n_id != gene_node]
 
         num_nodes_to_perturb = len(nodes_to_perturb)
@@ -304,56 +303,56 @@ def perturb_connected_components(
         else:
             selected_nodes = nodes_to_perturb.tolist()
 
-        # Create a copy of sub_data on CPU for NetworkX
+        # create a copy of sub_data on CPU for NetworkX
         sub_data_cpu = sub_data.clone().cpu()
 
-        # Create a NetworkX graph from sub_data_cpu to compute shortest paths
+        # create a NetworkX graph from sub_data_cpu to compute shortest paths
         subgraph_nx = to_networkx(sub_data_cpu, to_undirected=True)
 
-        # Map subgraph node indices to original node indices
+        # map subgraph node indices to original node indices
         mapping_nx = {
             i: sub_data_cpu.n_id[i].item() for i in range(len(sub_data_cpu.n_id))
         }
         subgraph_nx = nx.relabel_nodes(subgraph_nx, mapping_nx)
 
-        # Compute shortest path lengths from gene_node to all other nodes in subgraph
+        # compute shortest path lengths from gene_node to all other nodes in subgraph
         lengths = nx.single_source_shortest_path_length(subgraph_nx, gene_node)
 
-        # Initialize dictionary to store fold changes
+        # initialize dictionary to store fold changes
         fold_changes = {}
 
         for node_to_remove in selected_nodes:
             try:
-                # Get local index of node_to_remove in subgraph
+                # get local index of node_to_remove in subgraph
                 idx_to_remove = (
                     (sub_data.n_id == node_to_remove).nonzero(as_tuple=True)[0].item()
                 )
 
-                # Perform inference on perturbed subgraph
+                # perform inference on perturbed subgraph
                 result = runner.infer_perturbed_subgraph(
                     sub_data, idx_to_remove, mask_attr
                 )
 
                 if result is None:
-                    continue  # Skip if gene node is not in the subgraph
+                    continue  # skip if gene node is not in the subgraph
                 regression_out_perturbed, idx_in_perturbed = result
 
                 perturbation_prediction = regression_out_perturbed[
                     idx_in_perturbed
                 ].item()
 
-                # Compute fold change
+                # compute fold change
                 fold_change = runner.calculate_log2_fold_change(
                     baseline_prediction, perturbation_prediction
                 )
 
-                # Get the actual name of the node being removed
+                # get the actual name of the node being removed
                 node_name = idxs_inv.get(node_to_remove, str(node_to_remove))
 
-                # Get hop distance from gene_node to node_to_remove
+                # get hop distance from gene_node to node_to_remove
                 hop_distance = lengths.get(node_to_remove, -1)
 
-                # Store fold change with additional info
+                # store fold change with additional info
                 fold_changes[node_name] = {
                     "fold_change": fold_change,
                     "hop_distance": hop_distance,
@@ -361,20 +360,21 @@ def perturb_connected_components(
 
             except Exception as e:
                 print(f"An error occurred while processing node {node_to_remove}: {e}")
-                continue  # Skip this node and continue with the next one
+                continue  # skip this node and continue with the next one
 
-        # Store fold changes for this gene
+        # store fold changes for this gene
         gene_fold_changes[gene_id] = fold_changes
 
     return gene_fold_changes
 
 
-def main():
-    # Set device
+def main() -> None:
+    """Run perturbation experiments."""
+    # set device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(126)
 
-    # Specify files and parameters
+    # specify files and parameters
     lookup_file = "../gencode_to_genesymbol_lookup_table.txt"
     graph_file = "h1.pt"
     idx_file = "regulatory_only_h1_esc_allcontacts_global_full_graph_idxs.pkl"
@@ -387,15 +387,15 @@ def main():
     num_hops = 6
     max_nodes_to_perturb = 100
 
-    # Load data and model
+    # load data and model
     data, runner, node_idx_to_gene_id, gene_indices, idxs_inv, idxs = (
         load_data_and_model(lookup_file, graph_file, idx_file, model_file, device)
     )
 
-    # Evaluate the model
+    # evaluate the model
     df = get_baseline_predictions(data, runner, mask, device)
 
-    # Process predictions and save results
+    # process predictions and save results
     top_gene_nodes = get_best_predictions(
         df, node_idx_to_gene_id, gene_indices, topk, prediction_threshold, output_prefix
     )
@@ -404,10 +404,10 @@ def main():
         print("No top genes found. Exiting.")
         return
 
-    # Run perturbation Experiment One: perturb features
+    # run perturbation Experiment One: perturb features
     perturb_graph_features(data, runner, feature_indices, mask, device, output_prefix)
 
-    # Run perturbation Experiment Two: perturb connected components
+    # run perturbation Experiment Two: perturb connected components
     gene_fold_changes = perturb_connected_components(
         data,
         runner,
@@ -419,7 +419,7 @@ def main():
         mask_attr=mask,
     )
 
-    # Save the fold changes to a file
+    # save the fold changes to a file
     with open(f"{output_prefix}gene_fold_changes.pkl", "wb") as f:
         pickle.dump(gene_fold_changes, f)
 
