@@ -87,13 +87,29 @@ class TargetAssembler:
             rna_matrix=tissue_config.resources["rna"]
         )
 
+        return self._assign_target_to_split(tissue_config, rna_quantifications)
+
+    def assemble_tissue_median_targets(
+        self, tissue_config: TissueConfig
+    ) -> Dict[str, Dict[str, np.ndarray]]:
+        """Assemble tissue median targets based on provided split information."""
+        quantifications = self._get_tissue_median_quantifications(
+            gtex_name=tissue_config.resources["gtex_name"]
+        )
+
+        return self._assign_target_to_split(tissue_config, quantifications)
+
+    def _assign_target_to_split(
+        self, tissue_config: TissueConfig, quantifications: Dict[str, float]
+    ):
+        """Assign target values to the split partitions."""
         targets = {}
         for partition in self.split:
             partition_targets = {}
             for gene in self.split[partition]:
                 target = f'{gene}_{tissue_config.resources["tissue"]}'
                 partition_targets[target] = np.array(
-                    [self.match_quantification(gene, rna_quantifications)]
+                    [self.match_quantification(gene, quantifications)]
                 )
             targets[partition] = partition_targets
         return targets
@@ -133,6 +149,20 @@ class TargetAssembler:
         df = read_encode_rna_seq_data(rna_matrix)
         return (
             (df["TPM"] + self.pseudocount)
+            .apply(
+                lambda x: self._apply_log_transform(
+                    pd.DataFrame([x]), transform_type=self.log_transform
+                )[0][0]
+            )
+            .to_dict()
+        )
+
+    def _get_tissue_median_quantifications(self, gtex_name: str) -> Dict[str, float]:
+        """Returns a dictionary of gene: log transformed + pseudocount TPM
+        values for tissue median TPMs from GTEx."""
+        df = self._load_tpm_median_df()
+        return (
+            (df[gtex_name] + self.pseudocount)
             .apply(
                 lambda x: self._apply_log_transform(
                     pd.DataFrame([x]), transform_type=self.log_transform
@@ -212,7 +242,9 @@ class TargetAssembler:
 
     def _load_tpm_median_df(self) -> pd.DataFrame:
         """Load the GTEx median GCT."""
-        return parse(self.experiment_config.expression_median_matrix).data_df
+        return parse(
+            self.experiment_config.training_targets.expression_median_matrix
+        ).data_df
 
     def _load_protein_abundance_tissue_matrix(
         self, tissue_names: List[str]

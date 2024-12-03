@@ -162,6 +162,10 @@ class TrainingTargetConsolidator:
     ) -> Dict[str, Dict[str, np.ndarray]]:
         """Assemble training targets, according to the type of target for the experiment."""
         if self.target == "rna_seq":
+            if "gtex_name" in self.tissue_config.resources:
+                return assembler.assemble_tissue_median_targets(
+                    tissue_config=self.tissue_config
+                )
             return assembler.assemble_rna_targets(tissue_config=self.tissue_config)
         return assembler.assemble_matrix_targets()
 

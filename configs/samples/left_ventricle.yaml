@@ -54,9 +54,9 @@ local:
 
 methylation:
   cpg:
-    - ENCFF908SEW.bed
     - ENCFF318IKY.bed
     - ENCFF398ERY.bed
+    - ENCFF908SEW.bed
   cpg_filetype: ENCODE
   cpg_liftover: false
 
@@ -72,12 +72,13 @@ resources:
   tf_motifs: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/collapsed_motifs_overlapping_consensus_footprints_hg38.bed
   tpm: null
   tissue: left_ventricle
-  rna: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/tpm/ENCFF611MXW.tsv
-  marker_name: Heart
-  ppi_tissue: heart
+  gtex_name: Heart - Left Ventricle
+  marker_name: left_ventricle
+  ppi_tissue: left_ventricle
 
 tissue_specific_nodes:
   crms: crms.bed
   super_enhancer: SE_00_0014_SE_hg38.bed
   tads: VentricleLeft_STL003_Leung_2015-raw_TADs.txt
   tf_binding: interval.all.fps.0.0001.bed
+  loops: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/processed_loops/combinedloopcaller/left_ventricle_loops.bedpe
