@@ -69,7 +69,7 @@ resources:
   tf_motifs: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/collapsed_motifs_overlapping_consensus_footprints_hg38.bed
   tpm: null
   tissue: mammary
-  gtex_name: Breast - Mammary
+  gtex_name: Breast - Mammary Tissue
   marker_name: mammary
   ppi_tissue: mammary
 
