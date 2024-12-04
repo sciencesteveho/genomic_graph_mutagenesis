@@ -366,6 +366,7 @@ def perturb_node_features(
 
 def perturb_connected_components(
     data: Data,
+    device: torch.device,
     runner: PerturbRunner,
     top_gene_nodes: List[int],
     idxs_inv: Dict[int, str],
@@ -883,21 +884,22 @@ def main() -> None:
     )
 
     # # run experiment 1: node feature perturbation
-    perturb_node_features(
-        data=data,
-        runner=runner,
-        feature_indices=feature_indices,
-        mask=mask,
-        device=device,
-        node_idx_to_gene_id=node_idx_to_gene_id,
-        gencode_to_symbol=gencode_to_symbol,
-        output_prefix=outpath,
-        sample=sample,
-    )
+    # perturb_node_features(
+    #     data=data,
+    #     runner=runner,
+    #     feature_indices=feature_indices,
+    #     mask=mask,
+    #     device=device,
+    #     node_idx_to_gene_id=node_idx_to_gene_id,
+    #     gencode_to_symbol=gencode_to_symbol,
+    #     output_prefix=outpath,
+    #     sample=sample,
+    # )
 
     # run experiment 2: connected component perturbation
     component_fold_changes = perturb_connected_components(
         data=data,
+        device=device,
         runner=runner,
         top_gene_nodes=top_gene_nodes,
         idxs_inv=idxs_inv,
