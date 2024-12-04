@@ -835,7 +835,8 @@ def main() -> None:
 
     if sample == "k562":
         model_file = f"/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads/run_{run}/GAT_best_model.pt"
-    model_file = f"/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_{sample}_allcontacts-global_gat_2layers_200dim_2attnheads/run_{run}/GAT_best_model.pt"
+    else:
+        model_file = f"/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_{sample}_allcontacts-global_gat_2layers_200dim_2attnheads/run_{run}/GAT_best_model.pt"
     idx_file = f"/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/experiments/regulatory_only_{sample}_allcontacts_global/graphs/tpm_0.5_samples_0.1_test_8-9_val_10_rna_seq/regulatory_only_{sample}_allcontacts_global_full_graph_idxs.pkl"
     graph_file = f"/ocean/projects/bio210019p/stevesho/data/preprocess/recapitulations/pyg_graphs/{sample}_pyggraph.pt"
 
