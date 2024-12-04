@@ -877,17 +877,17 @@ def main() -> None:
     )
 
     # # run experiment 1: node feature perturbation
-    # perturb_node_features(
-    #     data=data,
-    #     runner=runner,
-    #     feature_indices=feature_indices,
-    #     mask=mask,
-    #     device=device,
-    #     node_idx_to_gene_id=node_idx_to_gene_id,
-    #     gencode_to_symbol=gencode_to_symbol,
-    #     output_prefix=outpath,
-    #     sample=sample,
-    # )
+    perturb_node_features(
+        data=data,
+        runner=runner,
+        feature_indices=feature_indices,
+        mask=mask,
+        device=device,
+        node_idx_to_gene_id=node_idx_to_gene_id,
+        gencode_to_symbol=gencode_to_symbol,
+        output_prefix=outpath,
+        sample=sample,
+    )
 
     # run experiment 2: connected component perturbation
     component_fold_changes = perturb_connected_components(
