@@ -22,6 +22,7 @@ from scipy.stats import ttest_ind  # type: ignore
 import torch
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import NeighborLoader  # type: ignore
+from torch_geometric.utils import subgraph  # type: ignore
 from torch_geometric.utils import to_networkx  # type: ignore
 from tqdm import tqdm  # type: ignore
 
@@ -383,16 +384,17 @@ def perturb_connected_components(
         # get the subgraph (only one batch since batch_size=1 and one input node)
         sub_data = next(iter(loader))
         sub_data = sub_data.to(runner.device)
-        print(f"sub_data.x shape: {sub_data.x.shape}")
-        print(f"First few node features: {sub_data.x[:5]}")
 
         # get index of gene_node in subgraph
         idx_in_subgraph = (sub_data.n_id == gene_node).nonzero(as_tuple=True)[0].item()
 
         # get baseline prediction for the gene in the subgraph
-        regression_out_sub = runner.infer_subgraph(
-            sub_data=sub_data, mask_attr=mask_attr
-        )
+        with torch.no_grad():
+            regression_out_sub, __annotations__ = runner.model(
+                x=sub_data.x,
+                edge_index=sub_data.edge_index,
+                mask=sub_data.all_mask_loss,
+            )
         print(f"regression_out_sub: {regression_out_sub}")
         baseline_prediction = regression_out_sub[idx_in_subgraph].item()
         print(f"Baseline prediction for gene {gene_id}: {baseline_prediction}")
@@ -447,18 +449,43 @@ def perturb_connected_components(
                 )
                 print(f"idx to remove is {idx_to_remove}")
 
-                # perform inference on perturbed subgraph
-                result = runner.infer_perturbed_subgraph(
-                    sub_data=sub_data,
-                    node_to_remove_idx=idx_to_remove,
-                    mask_attr=mask_attr,
-                    gene_node=gene_node,
+                # mask for nodes to keep (exclude node_to_remove)
+                mask_nodes = (
+                    torch.arange(sub_data.num_nodes, device=device) != idx_to_remove
+                )
+                nodes_to_keep = torch.arange(sub_data.num_nodes, device=device)[
+                    mask_nodes
+                ]
+
+                perturbed_edge_index, _, mapping = subgraph(
+                    subset=mask_nodes,  # Use 'subset' instead of 'nodes'
+                    edge_index=sub_data.edge_index,
+                    relabel_nodes=True,
+                    num_nodes=sub_data.num_nodes,
+                    return_edge_mask=True,
                 )
 
-                # Check if result is None or contains None elements
-                if result is None or any(elem is None for elem in result):
+                # Get perturbed node features and other attributes
+                perturbed_x = sub_data.x[mask_nodes]
+                perturbed_mask = sub_data.all_mask_loss[mask_nodes]
+                perturbed_n_id = sub_data.n_id[mask_nodes]
+
+                # Check if gene_node is still in the perturbed subgraph
+                if (perturbed_n_id == gene_node).sum() == 0:
                     continue  # Skip if gene node is not in the subgraph
-                regression_out_perturbed, idx_in_perturbed = result
+
+                # Find the new index of the gene_node after reindexing
+                idx_in_perturbed = (
+                    (perturbed_n_id == gene_node).nonzero(as_tuple=True)[0].item()
+                )
+
+                # perform inference on perturbed subgraph
+                with torch.no_grad():
+                    regression_out_perturbed, __annotations__ = runner.model(
+                        x=perturbed_x,
+                        edge_index=perturbed_edge_index,
+                        mask=perturbed_mask,
+                    )
 
                 perturbation_prediction = regression_out_perturbed[
                     idx_in_perturbed
@@ -508,14 +535,13 @@ def perturb_specific_nodes(
     # all node mask
     data = data.to(device)
     data = combine_masks(data)
-    data.all_mask_loss = data.test_mask_loss | data.train_mask_loss | data.val_mask_loss
 
     # all node loader
     all_loader = NeighborLoader(
         data,
         num_neighbors=[data.avg_edges] * 2,
         batch_size=64,
-        input_nodes=getattr(data, "all_mask"),
+        input_nodes=getattr(data, "all_mask_loss"),
         shuffle=False,
     )
 
@@ -789,8 +815,8 @@ def main() -> None:
     # idx_file = "/ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/experiments/regulatory_only_k562_allcontacts_global/graphs/tpm_0.5_samples_0.1_test_8-9_val_10_rna_seq/regulatory_only_k562_allcontacts_global_full_graph_idxs.pkl"
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sample", type=str, default="aorta", help="Sample name")
-    parser.add_argument("--run", type=int, default=3, help="Run number")
+    parser.add_argument("--sample", type=str, default="k562", help="Sample name")
+    parser.add_argument("--run", type=int, default=1, help="Run number")
     args = parser.parse_args()
 
     # user specified
@@ -850,32 +876,30 @@ def main() -> None:
         sample=sample,
     )
 
-    # run experiment 1: node feature perturbation
-    perturb_node_features(
-        data=data,
-        runner=runner,
-        feature_indices=feature_indices,
-        mask=mask,
-        device=device,
-        node_idx_to_gene_id=node_idx_to_gene_id,
-        gencode_to_symbol=gencode_to_symbol,
-        output_prefix=outpath,
-        sample=sample,
-    )
-
-    # # run experiment 2: connected component perturbation
-    # component_fold_changes = perturb_connected_components(
+    # # run experiment 1: node feature perturbation
+    # perturb_node_features(
     #     data=data,
     #     runner=runner,
-    #     top_gene_nodes=top_gene_nodes,
-    #     idxs_inv=idxs_inv,
+    #     feature_indices=feature_indices,
+    #     mask=mask,
+    #     device=device,
+    #     node_idx_to_gene_id=node_idx_to_gene_id,
+    #     gencode_to_symbol=gencode_to_symbol,
+    #     output_prefix=outpath,
+    #     sample=sample,
     # )
 
-    # # save the fold changes to a file
-    # with open(
-    #     f"{output_prefix}/{sample}_connected_components_perturbation.pkl", "wb"
-    # ) as f:
-    #     pickle.dump(component_fold_changes, f)
+    # run experiment 2: connected component perturbation
+    component_fold_changes = perturb_connected_components(
+        data=data,
+        runner=runner,
+        top_gene_nodes=top_gene_nodes,
+        idxs_inv=idxs_inv,
+    )
+
+    # save the fold changes to a file
+    with open(f"{outpath}/{sample}_connected_components_perturbation.pkl", "wb") as f:
+        pickle.dump(component_fold_changes, f)
 
     # # Run Experiment 3A: Essential gene perturbation
     # essential_fold_changes = essential_gene_perturbation(
@@ -883,7 +907,7 @@ def main() -> None:
     #     runner,
     #     idxs,
     #     gencode_to_symbol,
-    #     output_prefix=output_prefix,
+    #     output_prefix=outpath,
     #     num_runs=num_runs,
     # )
 
@@ -893,7 +917,7 @@ def main() -> None:
     #     runner,
     #     idxs,
     #     gencode_to_symbol,
-    #     output_prefix=output_prefix,
+    #     output_prefix=outpath,
     #     num_runs=num_runs,
     # )
 
