@@ -261,9 +261,7 @@ def perturb_node_features(
     sample: str = "k562",
 ) -> None:
     """Perform feature perturbation, compute differences, and save top affected genes."""
-    feature_node_differences: Dict[int, Dict[int, List[float]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    feature_node_differences = defaultdict(lambda: defaultdict(list))
 
     # use NeighborLoader to load the test data in batches
     test_loader = NeighborLoader(
@@ -317,14 +315,22 @@ def perturb_node_features(
             for idx, d in zip(node_indices, diff):
                 feature_node_differences[feature_index][idx.item()].append(d.item())
 
-    # after processing all batches, compute average differences for each node
+    # after processing all batches, compute average differences per node and per feature
     feature_node_avg_differences = {}
+    feature_fold_changes = {}
     for feature_index in feature_indices:
         node_diffs = feature_node_differences[feature_index]
+        # Compute average difference per node
         avg_diffs_per_node = {
             node_idx: sum(diffs) / len(diffs) for node_idx, diffs in node_diffs.items()
         }
         feature_node_avg_differences[feature_index] = avg_diffs_per_node
+
+        # Compute average difference per feature across all nodes
+        total_diff = sum(avg_diffs_per_node.values())
+        num_nodes = len(avg_diffs_per_node)
+        avg_diff = total_diff / num_nodes
+        feature_fold_changes[feature_index] = avg_diff
 
         # get top 100 genes most affected by the feature ablation
         sorted_node_diffs = sorted(
@@ -338,7 +344,8 @@ def perturb_node_features(
             # map node_idx to gene_id
             gene_id = node_idx_to_gene_id.get(node_idx)
             if gene_id and "ENSG" in gene_id:
-                if gene_symbol := gencode_to_symbol.get(gene_id.split("_")[0]):
+                gene_symbol = gencode_to_symbol.get(gene_id.split("_")[0])
+                if gene_symbol:
                     top_100_gene_names.append((gene_symbol, diff_value))
                 else:
                     top_100_gene_names.append((gene_id, diff_value))
@@ -352,10 +359,9 @@ def perturb_node_features(
             for gene, diff_value in top_100_gene_names:
                 f.write(f"{gene}\t{diff_value}\n")
 
-    # save the feature fold changes to a file (optional, depending on your needs)
-    # You might need to adjust this part based on how you compute fold changes
+    # save the feature fold changes to a file
     with open(f"{output_prefix}/{sample}_feature_fold_changes.pkl", "wb") as f:
-        pickle.dump(feature_node_avg_differences, f)
+        pickle.dump(feature_fold_changes, f)
 
 
 def perturb_connected_components(
