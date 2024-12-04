@@ -212,14 +212,17 @@ class PerturbRunner:
         mask_attr: str,
     ) -> torch.Tensor:
         """Perform inference on a subgraph."""
+        self.model.eval()
         sub_data = sub_data.to(self.device)
-        mask = getattr(sub_data, f"{mask_attr}_mask_loss")
+        # mask = getattr(sub_data, f"{mask_attr}_mask_loss")
+        mask = sub_data.all_mask_loss
 
         regression_out, _ = self.model(
             x=sub_data.x,
             edge_index=sub_data.edge_index,
             mask=mask,
         )
+        print(f"Regression output without mask: {regression_out}")
         return regression_out
 
     @torch.no_grad()
@@ -228,14 +231,16 @@ class PerturbRunner:
         sub_data: torch_geometric.data.Data,
         node_to_remove_idx: int,
         mask_attr: str,
+        gene_node: int,  # Add gene_node as a parameter
     ) -> Tuple[torch.Tensor, Optional[int]]:
         """Perform inference on a perturbed subgraph with a node removed."""
-        # mask = all nodes except the node to remove
+        # Mask = all nodes except the node to remove
+        self.model.eval()
         mask_nodes = (
             torch.arange(sub_data.num_nodes, device=self.device) != node_to_remove_idx
         )
 
-        # get subgraph with node removed
+        # Get subgraph with node removed
         perturbed_edge_index, _, _ = subgraph(
             subset=mask_nodes,
             edge_index=sub_data.edge_index,
@@ -244,26 +249,24 @@ class PerturbRunner:
             return_edge_mask=True,
         )
 
-        # get copy feats and mask to perturbed subgraph
+        # Copy features and mask to perturbed subgraph
         perturbed_x = sub_data.x[mask_nodes]
-        perturbed_mask = getattr(sub_data, mask_attr)[mask_nodes]
+        perturbed_mask = sub_data.all_mask_loss[mask_nodes]
         perturbed_n_id = sub_data.n_id[mask_nodes]
 
-        # ensure gene_node is still in the perturbed subgraph
-        if (perturbed_n_id == sub_data.n_id[node_to_remove_idx]).sum() == 0:
+        # Ensure gene_node is still in the perturbed subgraph
+        if (perturbed_n_id == gene_node).sum() == 0:
             print(
-                f"Gene node not in perturbed subgraph: {sub_data.n_id[node_to_remove_idx]}"
+                f"Gene node not in perturbed subgraph after removing node {sub_data.n_id[node_to_remove_idx].item()}"
             )
             return None, None
 
-        # find the new index of the target node after reindexing
+        # Find the new index of the gene node after reindexing
         idx_in_perturbed = (
-            (perturbed_n_id == sub_data.n_id[node_to_remove_idx])
-            .nonzero(as_tuple=True)[0]
-            .item()
+            (perturbed_n_id == gene_node).nonzero(as_tuple=True)[0].item()
         )
 
-        # inference
+        # Inference
         regression_out, _ = self.model(
             x=perturbed_x,
             edge_index=perturbed_edge_index,
@@ -271,8 +274,8 @@ class PerturbRunner:
         )
         return regression_out, idx_in_perturbed
 
+    @staticmethod
     def load_model(
-        self,
         checkpoint_file: str,
         map_location: torch.device,
         model: str,
@@ -310,7 +313,7 @@ class PerturbRunner:
             attention_task_head=attention_task_head,
             train_dataset=None,
         )
-        model = model.to(self.device)
+        model = model.to(map_location)
 
         # load the model
         checkpoint = torch.load(checkpoint_file, map_location=map_location)
