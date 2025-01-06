@@ -76,8 +76,8 @@ def plot_predicted_versus_expected(
 
     # jointplot - hexbin scatter with marginal histograms
     plot = sns.jointplot(
-        x=expected,
-        y=predicted,
+        x=predicted,
+        y=expected,
         kind="hex",
         height=3,
         ratio=4,
@@ -98,10 +98,10 @@ def plot_predicted_versus_expected(
     )
 
     # set labels and title
-    plot.ax_joint.set_xlabel("Expected Log2 Expression")
-    plot.ax_joint.set_ylabel("Predicted Log2 Expression")
+    plot.ax_joint.set_xlabel("Predicted Log2 Expression")
+    plot.ax_joint.set_ylabel("Expected Log2 Expression")
     plot.figure.suptitle(
-        f"Expected versus predicted TPM\n"
+        f"Predicted versus expected TPM\n"
         rf"Spearman's $\rho$: {spearman_r:.4f}"
         f"\nRMSE: {rmse:.4f}",
         y=0.95,
@@ -116,12 +116,12 @@ def plot_predicted_versus_expected(
     )
 
     # adjust axis limits to include all data points
-    plot.ax_joint.set_xlim(np.min(expected) - 0.5, np.max(expected) + 0.5)
-    plot.ax_joint.set_ylim(np.min(predicted) - 0.5, np.max(predicted) + 0.5)
+    plot.ax_joint.set_xlim(np.min(predicted) - 0.5, np.max(predicted) + 0.5)
+    plot.ax_joint.set_ylim(np.min(expected) - 0.5, np.max(expected) + 0.5)
 
     # calculate and plot the linear regression line
-    slope, intercept, _, _, _ = stats.linregress(expected, predicted)
-    x_fit = np.linspace(np.min(expected) - 0.5, np.max(expected) + 0.5, 100)
+    slope, intercept, _, _, _ = stats.linregress(predicted, expected)
+    x_fit = np.linspace(np.min(predicted) - 0.5, np.max(predicted) + 0.5, 100)
     y_fit = slope * x_fit + intercept
     plot.ax_joint.plot(x_fit, y_fit, color="indianred", linewidth=0.9)
 

@@ -30,7 +30,7 @@ from tqdm import tqdm  # type: ignore
 from omics_graph_learning.architecture_builder import build_gnn_architecture
 from omics_graph_learning.combination_loss import CombinationLoss
 from omics_graph_learning.graph_to_pytorch import GraphToPytorch
-from omics_graph_learning.perturbation.perturb_graph import PerturbationConfig
+from omics_graph_learning.interpret.perturb_graph import PerturbationConfig
 from omics_graph_learning.schedulers import OptimizerSchedulerHandler
 from omics_graph_learning.utils.arg_parser import OGLCLIParser
 from omics_graph_learning.utils.common import count_model_parameters

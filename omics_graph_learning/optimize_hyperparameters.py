@@ -10,7 +10,7 @@ the optimization does not require saving model states, we opt to save
 performance metrics in memory before writing to JSON files.
 
 The optimization of the graphs is done on a subset of whole chromosomes. We opt
-for 40% (8 chromosomes) but keep the entirety of the validation chromosomes for
+for 60% (12 chromosomes) but keep the entirety of the validation chromosomes for
 the optimization."""
 
 
