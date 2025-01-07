@@ -53,6 +53,29 @@ To start, users must create the following directory ```shared_data/``` and subdi
 * `graph_processing/raw_tissue_data/...`
 
 <br>
+Quickly create the required directory structure with the following:
+
+```sh
+# directories to create
+DIRS=(
+    "$ROOT_DIR/graph_processing/shared_data/local"
+    "$ROOT_DIR/graph_processing/shared_data/regulatory_elements"
+    "$ROOT_DIR/graph_processing/shared_data/references"
+    "$ROOT_DIR/graph_processing/shared_data/interaction"
+    "$ROOT_DIR/graph_processing/shared_data/processed_loops"
+    "$ROOT_DIR/graph_processing/shared_data/targets/expression"
+    "$ROOT_DIR/graph_processing/shared_data/targets/matrices"
+    "$ROOT_DIR/graph_processing/shared_data/targets/tpm"
+    "$ROOT_DIR/graph_processing/raw_tissue_data"
+)
+
+# make each each directory
+for DIR in "${DIRS[@]}"; do
+    mkdir -p "$DIR"; then
+done
+```
+
+<br>
 The following directories will be made automatically during the pipeline.
 
 ### Graph Construction
@@ -69,22 +92,18 @@ The following directories will be made automatically during the pipeline.
 <br>
 
 ## Preprocessing
-Given the large amount of multimodal data, some files required preprocessing before input into the OGL. Not all of it is included as part of the OGL pipeline.
+Given the large amount of multimodal data many files require preprocessing before input into OGL. Complete pre-processing scripts are provided.
 
 `discretionary_preprocessing/` provides examples scripts for the processing of raw 3D chromatin data. <br>
 `programmatic_data_download/` provides scripts that automate the download and pre-processing for most necessary parts of the pipeline.
 <br>
 <br>
 
-## Usage
+## Usage and Examples
 OGL is designed to run end to end on a computing cluster and requires:
-1. An experiment config, see examples in`configs/experiments`.
-2. A sample config, see examples in `configs/samples`.
-3. Slurm scripts adjusted for your computing environment. Example SLURM scripts
-   can be found in `/examples/slurm`.
+1. An experiment and sample configs. Detailed information is provided in [configs](docs/configs.md).
+2. Job submission scripts adjusted for your computing environment. `ogl_pipeline.py` assumes a slurm cluster. The script will need to be adjusted if running in other environments. Example SLURM scripts can be found in `/examples/slurm`.
 
-`ogl_pipeline.py` assumes a slurm cluster. The script will need to be adjusted if running in other environments.
-<br>
 <br>
 
 ### Required Argument(s)
@@ -97,7 +116,16 @@ Users can run OGL to two separate endpoints. <br>
 1. Endpoint (1) takes the pipeline to hyperparameter optimization, where a model is not trained but parameters for a performant model are provided through successive pruning.
 2. Endpoint (2) takes the pipeline to a trained GNN. Trained GNNs automatically run for 3 separate random seeds and their metrics include median performance and a 95% confidence interval. Single runs can be specified using the `--run_number` argument.
 
-#### Example: run pipeline from start --> hyperparameter optimization on K562.
+<br>
+
+### Example use case: run pipeline from start to hyperparameter optimization (endpoint 1)
+<details>
+  <summary> Hyperparameter optimization on a K562 model </summary>
+
+<br>
+
+Running the following command will submit a series of jobs that takes the pipeline through pre-processing, node and edge generation, graph construction, target assemblage, feature scaling, and run 200 optuna trials, culminating in hyperparameter optimization and a neural architecture search.
+
 ```sh
 python ogl/omics_graph_learning/ogl_pipeline.py \
   --partition RM \
@@ -106,9 +134,31 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
   --optimize_params \
   --n_gpus 20
 ```
-#### Example: run pipeline from start --> training a GNN of specific architecture.
+
+Trial history, feature importance, and slice plots will be output, as well as `optuna_results.csv` which contains trial history sorted by performance.
+<div align="left">
+    <img src='docs/_static/history.png'>
+</div>
+<div align="left">
+    <img src='docs/_static/importances.png'>
+</div>
+
+
+</details>
+
+<br>
+
+### Example use case: run pipeline from start to a trained GNN of a specific architecture (endpoint 2)
+
+<details>
+  <summary> Training a "hippocampus" GNN model </summary>
+
+<br>
+
+Running the following command will submit a series of jobs that takes the pipeline through pre-processing, node and edge generation, graph construction, target assemblage, feature scaling, and culminate in training three GNN models on independent seeds.
+
 ```sh
-  sample="left_ventricle"
+  sample="hippocampus"
   config=("${sample}_allcontacts_global.yaml")
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
@@ -129,6 +179,32 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
     --positional_encoding \
     --model_name regulatory_${sample}_allcontacts
 ```
+Each run (1-3) will produce multiple files logging the metadata, architecture, and training. Of pertinence:
+  - `final_model.pt`: model checkpoint saved at the end of training
+  - `best_model.pt`: model checkpoint saved if early stopping is triggered
+  - `eval_metrics.json`: performance metrics for the trained model
+  - `performance.png`: an expected vs predicted plot of model performance
+
+### eval_metrics.json
+```sh
+{
+    "Final test loss": 1.432008501180574,
+    "Final test pearson": 0.711228820220772,
+    "Final test RMSE": 1.6783552169799805,
+    "Final test accuracy": 0.900551438331604,
+    "Bootstrap pearson": 0.7113068023714024,
+    "CI lower": 0.7110652918637272,
+    "CI upper": 0.7115483128790776
+}
+```
+### performance.png
+<div align="left">
+    <img src='docs/_static/hippocampus_performance.png'>
+</div>
+
+</details>
+
+<br>
 
 *Note: for more details on usage, see [arguments](docs/arguments.md)*.
 
