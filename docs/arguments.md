@@ -1,5 +1,5 @@
 
-# Omics Graph Learning Pipeline (OGL) CLI Arguments
+# Omics Graph Learning CLI Arguments
 
 Below is a detailed description of the available command_line arguments used by the `OGLCLIParser` class.
 
