@@ -22,8 +22,8 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd  # type: ignore
 
 
 class ModelMetrics:
-    """
-    Class to store model performance metrics and compute statistics across runs.
+    """Class to store model performance metrics and compute statistics across
+    runs.
 
     Attributes:
         model_dir: Path to the model directory.
@@ -37,10 +37,10 @@ class ModelMetrics:
             model_dir = Path(model_dir)
         self.model_dir = model_dir
 
-        # Collect metrics from all runs
+        # collect metrics from all runs
         self.per_run_df = self._load_metrics()
 
-        # Compute summary statistics
+        # compute summary statistics
         self.summary_df = self._compute_summary()
 
     def _load_metrics(self) -> pd.DataFrame:
@@ -73,7 +73,7 @@ class ModelMetrics:
                 print(f"Metrics file not found: {metrics_file}")
 
         if not metrics:
-            # If no metrics were loaded, return a DataFrame with NaNs
+            # if no metrics were loaded, return a DataFrame with NaNs
             return pd.DataFrame(
                 {
                     "Model": [self.model_dir.name],
@@ -86,7 +86,7 @@ class ModelMetrics:
                 }
             )
 
-        # Create DataFrame from the list of metrics
+        # create DataFrame from the list of metrics
         return pd.DataFrame(metrics)
 
     def _compute_summary(self) -> pd.DataFrame:
@@ -148,19 +148,18 @@ class ModelMetrics:
 
 
 class ModelComparison:
-    """
-    Class to compare model performances using statistical tests.
+    """Class to compare model performances using statistical tests.
 
     Attributes:
-        combined_metrics_df: DataFrame containing per-run metrics for all models.
+        combined_metrics_df: DataFrame containing per-run metrics for all
+        models.
         summary_df: DataFrame containing mean and std for each model.
     """
 
     def __init__(
         self, combined_metrics_df: pd.DataFrame, summary_df: pd.DataFrame
     ) -> None:
-        """
-        Initialize the ModelComparison class.
+        """Initialize the ModelComparison class.
 
         Args:
             combined_metrics_df: DataFrame with per-run metrics for all models.
@@ -170,19 +169,19 @@ class ModelComparison:
         self.summary_df = summary_df
 
     def perform_anova(self) -> float:
-        """
-        Perform one-way ANOVA to test if there are any statistically significant differences between the means of the models.
+        """Perform one-way ANOVA to test if there are any statistically
+        significant differences between the means of the models.
 
         Returns:
             p-value from the ANOVA test.
         """
-        # Extract the data for ANOVA
+        # extract the data for ANOVA
         groups = [
             group["Final_Test_Pearson"].values
             for name, group in self.combined_metrics_df.groupby("Model")
         ]
 
-        # Perform one-way ANOVA
+        # perform one-way ANOVA
         f_stat, p_val = f_oneway(*groups)
         print(
             f"One-Way ANOVA Results: F-statistic = {f_stat:.4f}, p-value = {p_val:.4f}"
@@ -190,14 +189,14 @@ class ModelComparison:
         return p_val
 
     def perform_posthoc_ttests(self, alpha: float = 0.05) -> pd.DataFrame:
-        """
-        Perform post-hoc pairwise t-tests with Bonferroni correction.
+        """Perform post-hoc pairwise t-tests with Bonferroni correction.
 
         Args:
             alpha: Significance level.
 
         Returns:
-            DataFrame containing pairwise comparisons and their adjusted p-values.
+            DataFrame containing pairwise comparisons and their adjusted
+            p-values.
         """
         models = self.combined_metrics_df["Model"].unique()
         results = []
@@ -217,11 +216,11 @@ class ModelComparison:
                     self.combined_metrics_df["Model"] == model_j
                 ]["Final_Test_Pearson"]
 
-                # Ensure paired data if applicable; otherwise, use independent t-test
-                # Here, runs are independent between models
+                # ensure paired data if applicable; otherwise, use independent t-test
+                # runs are independent between models
                 t_stat, p_val = ttest_rel(data_i, data_j)
 
-                # Apply Bonferroni correction
+                # apply Bonferroni correction
                 adjusted_p_val = p_val * num_comparisons
                 adjusted_p_val = min(adjusted_p_val, 1.0)
 
@@ -239,24 +238,22 @@ class ModelComparison:
         print("\nPost-Hoc Pairwise T-Test Results with Bonferroni Correction:")
         print(results_df)
 
-        # Save to CSV
         results_df.to_csv("posthoc_pairwise_ttest_results.csv", index=False)
 
         return results_df
 
     def visualize_pvalues(self, posthoc_df: pd.DataFrame) -> None:
-        """
-        Visualize the adjusted p-values as a heatmap.
+        """Visualize the adjusted p-values as a heatmap.
 
         Args:
             posthoc_df: DataFrame containing post-hoc test results.
         """
-        # Create a pivot table for heatmap
+        # create a pivot table for heatmap
         pivot_df = posthoc_df.pivot(
             index="Model 1", columns="Model 2", values="Adjusted p-value (Bonferroni)"
         )
 
-        # Initialize a square DataFrame for symmetric heatmap
+        # initialize a square DataFrame for symmetric heatmap
         models = self.combined_metrics_df["Model"].unique()
         heatmap_df = pd.DataFrame(np.nan, index=models, columns=models)
 
