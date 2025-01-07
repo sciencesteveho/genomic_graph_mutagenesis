@@ -224,6 +224,16 @@ Each run (1-3) will produce multiple files logging the metadata, architecture, a
 ### Modularity and flexible
 OGL adopts a GNN "solution space" as opposed to hard architecture. The models are highly flexible and part of the neural architecture search is performed in tandem with hyperparameter optimization. Some flexible components include gnn operators, training scheduler, training optimizer, activation function, residual connection type, and more. See [arguments](docs/arguments.md).
 
+<details>
+<summary>Flexible architecture schematic</summary>
+
+<div align="left">
+    <img src='docs/_static/architecture.png'>
+</div>
+
+</details>
+
+
 ### Graph construction
 Graphs are constructed using knowledge-graph inspired representations: nodes represent genes, regulatory elements, and TADs, connected via chromatin loops (distal) or linear proximity.
 
