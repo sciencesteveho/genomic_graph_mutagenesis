@@ -33,6 +33,10 @@ Using a conda environment is highly recommended with `Python == 3.9.16`. Use `pi
 <br>
 
 ## Directory Structure
+
+<details>
+<summary>Expand details on directory structure</summary>
+
 ### Working Directory
 OGL's directory structures will be made from the main directory you place it, `path/to/graph_processing`. <br>
 To start, users must create the following directory ```shared_data/``` and subdirectories to place their raw data.
@@ -55,6 +59,8 @@ To start, users must create the following directory ```shared_data/``` and subdi
 <br>
 Quickly create the required directory structure with the following:
 
+<details open><summary>Bash loop to make directories</summary>
+
 ```sh
 # directories to create
 DIRS=(
@@ -74,6 +80,7 @@ for DIR in "${DIRS[@]}"; do
     mkdir -p "$DIR"; then
 done
 ```
+</details>
 
 <br>
 The following directories will be made automatically during the pipeline.
@@ -88,7 +95,9 @@ The following directories will be made automatically during the pipeline.
 * `graph_processing/models/...`
     * `run_*number*`: model checkpoints, plots, and metrics
     * `tensorboard/`: tensorboard events logging
-    
+
+</details>
+
 <br>
 
 ## Preprocessing
@@ -119,7 +128,7 @@ Users can run OGL to two separate endpoints. <br>
 <br>
 
 ### Example use case: run pipeline from start to hyperparameter optimization (endpoint 1)
-<details>
+<details open>
   <summary> Hyperparameter optimization on a K562 model </summary>
 
 <br>
@@ -150,7 +159,7 @@ Trial history, feature importance, and slice plots will be output, as well as `o
 
 ### Example use case: run pipeline from start to a trained GNN of a specific architecture (endpoint 2)
 
-<details>
+<details open>
   <summary> Training a "hippocampus" GNN model </summary>
 
 <br>
