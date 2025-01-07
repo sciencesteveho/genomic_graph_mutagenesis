@@ -131,8 +131,8 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
 ```
 
 *Note: for more details on usage, see [arguments](docs/arguments.md)*.
-<br>
 
+<br>
 
 
 ## Model Overview
