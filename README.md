@@ -227,6 +227,15 @@ OGL adopts a GNN "solution space" as opposed to hard architecture. The models ar
 ### Graph construction
 Graphs are constructed using knowledge-graph inspired representations: nodes represent genes, regulatory elements, and TADs, connected via chromatin loops (distal) or linear proximity.
 
+<details>
+<summary>Graph construction schematic</summary>
+
+<div align="left">
+    <img src='docs/_static/graph_construction.png'>
+</div>
+
+</details>
+
 ### Node features
 
 Each node is accompanied by either a 39 or 44-dimensional feature vector consisting of an optional binned positional encoding and a mix of static and tissue-specific data tracks. See the associated paper's supplementary materials for more information.
