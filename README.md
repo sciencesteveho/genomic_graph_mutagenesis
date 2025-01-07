@@ -18,10 +18,12 @@ Omics Graph Learning (OGL) is a fully integrated pipeline revolving around the c
 8. Integrated hyperparameter optimization
 9. Interpretibility and perturbation experiments
 10. Built-in reproducibility measures
+
 <br>
-<br>
+
 ## Installation
-OGL is current available as source code. Install it via:
+OGL is currently available as source code. Install it via:
+
 ```sh
 $ git clone https://github.com/sciencesteveho/omics_graph_learning.git
 ```
