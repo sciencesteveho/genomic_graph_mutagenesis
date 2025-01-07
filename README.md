@@ -137,7 +137,7 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
 
 ## Model Overview
 ### Modularity and flexible
-OGL adopts a GNN "solution space" as opposed to hard architecture. The models are highly flexible and part of the neural architecture search is performed in tandem with hyperparameter optimization. Some flexible components include gnn operators, training schedular, training optimizer, activation function, residual connection, and more. See [arguments](docs/arguments.md).
+OGL adopts a GNN "solution space" as opposed to hard architecture. The models are highly flexible and part of the neural architecture search is performed in tandem with hyperparameter optimization. Some flexible components include gnn operators, training scheduler, training optimizer, activation function, residual connection type, and more. See [arguments](docs/arguments.md).
 
 ### Graph construction
 Graphs are constructed using knowledge-graph inspired representations: nodes represent genes, regulatory elements, and TADs, connected via chromatin loops (distal) or linear proximity.
