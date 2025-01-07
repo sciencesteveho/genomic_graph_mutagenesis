@@ -7,7 +7,9 @@
 <br>
 
 ## Overview
-Omics Graph Learning (OGL) is a fully integrated pipeline revolving around the construction of multi-modal, heterogenous graphs from omics data. Modules for all of the following are included:
+Omics Graph Learning (OGL) is a fully integrated pipeline revolving around the construction of multi-modal, heterogenous graphs from omics data and produces expression prediction models with state-of-the-art performance.
+
+Modules for all of the following are included:
 1. Discretionary data pre-processing
 2. Programmatic data download
 3. Graph construction from tissue-specific datasets
