@@ -65,7 +65,7 @@ The following directories will be made automatically during the pipeline.
 * `graph_processing/models/...`
     * `run_*number*`: model checkpoints, plots, and metrics
     * `tensorboard/`: tensorboard events logging
-<br>
+    
 <br>
 
 ## Preprocessing
