@@ -72,6 +72,7 @@ class OGLCLIParser:
             "--experiment_yaml",
             type=str,
             help="Path to experiment YAML file",
+            required=True,
         )
         self.parser.add_argument(
             "--partition",
