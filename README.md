@@ -61,26 +61,30 @@ To start, users must create the following directory ```shared_data/``` and subdi
 <br>
 Quickly create the required directory structure with the following:
 
-<details open><summary>Bash loop to make directories</summary>
+<details open><summary>Bash function to make directories</summary>
 
 ```sh
-# directories to create
-DIRS=(
-    "$ROOT_DIR/graph_processing/shared_data/local"
-    "$ROOT_DIR/graph_processing/shared_data/regulatory_elements"
-    "$ROOT_DIR/graph_processing/shared_data/references"
-    "$ROOT_DIR/graph_processing/shared_data/interaction"
-    "$ROOT_DIR/graph_processing/shared_data/processed_loops"
-    "$ROOT_DIR/graph_processing/shared_data/targets/expression"
-    "$ROOT_DIR/graph_processing/shared_data/targets/matrices"
-    "$ROOT_DIR/graph_processing/shared_data/targets/tpm"
-    "$ROOT_DIR/graph_processing/raw_tissue_data"
-)
+function create_directory_structure() {
+    local ROOT_DIR=$1  # path/to/root_dir
 
-# make each each directory
-for DIR in "${DIRS[@]}"; do
-    mkdir -p "$DIR"; then
-done
+    # directories to create
+    DIRS=(
+        "$ROOT_DIR/graph_processing/shared_data/local"
+        "$ROOT_DIR/graph_processing/shared_data/regulatory_elements"
+        "$ROOT_DIR/graph_processing/shared_data/references"
+        "$ROOT_DIR/graph_processing/shared_data/interaction"
+        "$ROOT_DIR/graph_processing/shared_data/processed_loops"
+        "$ROOT_DIR/graph_processing/shared_data/targets/expression"
+        "$ROOT_DIR/graph_processing/shared_data/targets/matrices"
+        "$ROOT_DIR/graph_processing/shared_data/targets/tpm"
+        "$ROOT_DIR/graph_processing/raw_tissue_data"
+    )
+
+    # make each each directory
+    for DIR in "${DIRS[@]}"; do
+        mkdir -p "$DIR";
+    done
+}
 ```
 </details>
 
