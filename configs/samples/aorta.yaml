@@ -54,7 +54,7 @@ local:
 
 methylation:
   cpg: ENCFF669KDL.bed
-    # - ENCFF901HLR.bed
+    - ENCFF901HLR.bed
   cpg_filetype: ENCODE
   cpg_liftover: false
 

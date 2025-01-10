@@ -54,8 +54,8 @@ local:
 
 methylation:
   cpg: ENCFF318IKY.bed
-    # - ENCFF398ERY.bed
-    # - ENCFF908SEW.bed
+    - ENCFF398ERY.bed
+    - ENCFF908SEW.bed
   cpg_filetype: ENCODE
   cpg_liftover: false
 

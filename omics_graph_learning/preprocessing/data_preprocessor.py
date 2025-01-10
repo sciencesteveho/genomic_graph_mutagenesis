@@ -295,7 +295,7 @@ class GenomeDataPreprocessor:
                 f.write("%s\n" % item)
 
     @time_decorator(print_args=True)
-    def _combined_cpg(self, beds: List[str], path: str) -> None:
+    def _combine_cpg_files(self, beds: List[str], path: str) -> None:
         """Combined methylation signal across CpGs and average by dividing by
         the amount of files combined.
         """
@@ -322,20 +322,24 @@ class GenomeDataPreprocessor:
         combined across CpGs and averaged by dividing by the amount of files
         combined.
         """
+
+        # merge multiple cpg files if necessary
         if isinstance(bed, list):
-            self._combined_cpg(beds=bed, path=f"{self.tissue_dir}/unprocessed")
+            self._combine_cpg_files(beds=bed, path=f"{self.tissue_dir}/unprocessed")
             cpg_bed = "merged_cpgs"
             cpg_percent_col = 4
         else:
             cpg_bed = bed
             cpg_percent_col = 11
 
+        # if a roadmap file, convert
         if self.methylation["cpg_filetype"] == "roadmap":
             cpg_bed = self._bigwig_to_filtered_bedgraph(
                 path=f"{self.tissue_dir}/unprocessed",
                 file=cpg_bed.split(".bigwig")[0],
             )
 
+        # liftover if necessary
         if self.methylation["cpg_liftover"] == True:
             self._liftover(
                 liftover=self.resources["liftover"],
@@ -344,25 +348,22 @@ class GenomeDataPreprocessor:
                 path=f"{self.tissue_dir}/unprocessed",
             )
 
+            # update cpg_bed to the lifted version
+            cpg_bed = f"{cpg_bed}_lifted"
+
         if self.methylation["cpg_filetype"] == "ENCODE":
-            file = f"{self.tissue_dir}/unprocessed/{bed}_gt80"
+            filtered_file = f"{self.tissue_dir}/unprocessed/{cpg_bed}_gt80"
             gt_gc = f"awk -v FS='\t' -v OFS='\t' '${cpg_percent_col} >= 80' {self.tissue_dir}/unprocessed/{bed} \
-                > {file}"
+                > {filtered_file}"
             self._run_cmd(gt_gc)
-        # elif self.methylation["cpg_filetype"] == "GEO":
-        #     file = f"{self.tissue_dir}/unprocessed/{bed}_gt80"
-        #     gt_gc = f"sed -e 's/\//\t/g' \
-        #         | tr -d '\ \
-        #         | awk '{{print $4/$5}}' \
-        #         | awk '$4 >= 0.8' \
-        #         > {file}"
+            final_bed = filtered_file
         else:
-            file = f"{self.tissue_dir}/unprocessed/{cpg_bed}_lifted"
+            final_bed = f"{self.tissue_dir}/unprocessed/{cpg_bed}"
 
         bedtools_cmd = f"bedtools merge \
-            -i {file} \
-            | awk -v FS='\t' -v OFS='\t' '{{print $1, $2, $3, \"cpg_methyl\"}}' \
-            > {self.tissue_dir}/local/cpg_{self.tissue}_parsed.bed"
+                -i {final_bed} \
+                | awk -v FS='\t' -v OFS='\t' '{{print $1, $2, $3, \"cpg_methyl\"}}' \
+                > {self.tissue_dir}/local/cpg_{self.tissue}_parsed.bed"
 
         self._run_cmd(bedtools_cmd)
 

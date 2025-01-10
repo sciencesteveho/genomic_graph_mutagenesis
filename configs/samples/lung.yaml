@@ -54,8 +54,8 @@ local:
 
 methylation:
   cpg: ENCFF532PDE.bed
-    # - ENCFF453HAD.bed
-    # - ENCFF821OMH.bed
+    - ENCFF453HAD.bed
+    - ENCFF821OMH.bed
   cpg_filetype: ENCODE
   cpg_liftover: false
 

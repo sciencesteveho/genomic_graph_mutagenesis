@@ -54,8 +54,8 @@ local:
 
 methylation:
   cpg: ENCFF341TLB.bed
-    # - ENCFF796CSP.bed
-    # - ENCFF939WLM.bed
+    - ENCFF796CSP.bed
+    - ENCFF939WLM.bed
   cpg_filetype: ENCODE
   cpg_liftover: false
 

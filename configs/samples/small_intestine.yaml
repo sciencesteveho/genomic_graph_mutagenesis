@@ -54,8 +54,8 @@ local:
 
 methylation:
   cpg: ENCFF387UUA.bed
-    # - ENCFF113RNL.bed
-    # - ENCFF891UDL.bed
+    - ENCFF113RNL.bed
+    - ENCFF891UDL.bed
   cpg_filetype: ENCODE
   cpg_liftover: false
 
