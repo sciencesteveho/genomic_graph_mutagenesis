@@ -83,7 +83,7 @@ configs=(epimap encode)
 for config in "${configs[@]}"; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
-    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global_"${config}" \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global_"${config}".yaml \
     --target rna_seq \
     --model GAT \
     --gnn_layers 2 \

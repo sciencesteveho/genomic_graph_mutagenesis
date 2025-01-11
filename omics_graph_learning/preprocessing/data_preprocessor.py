@@ -143,7 +143,6 @@ class GenomeDataPreprocessor:
         interact_files = {
             # "circuits": f"{self.dirs['circuit_dir']}/{self.interaction['circuits']}",
             # "ppis": f"{self.shared_data_dir}/interaction/{self.interaction['ppis']}",
-            "tf_marker": f"{self.shared_data_dir}/interaction/{self.interaction['tf_marker']}",
         }
 
         with contextlib.suppress(TypeError):

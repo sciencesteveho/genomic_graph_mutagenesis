@@ -284,51 +284,6 @@ class EdgeParser:
                         "mirna",
                     )
 
-    # def _tf_markers(
-    #     self,
-    #     interaction_file: str,
-    # ) -> Generator[Tuple[str, str, str], None, None]:
-    #     """Filters tf markers based on specified conditions.
-
-    #     Args:
-    #         interaction_file (str): The path to the interaction file.
-
-    #     Returns:
-    #         List[Tuple[str, str]]: A list of filtered tf marker interactions.
-    #     """
-    #     tf_keep = ["TF", "I Marker", "TFMarker"]
-    #     with open(interaction_file, newline="") as file:
-    #         reader = csv.reader(file, delimiter="\t")
-    #         next(reader)  # skip header
-
-    #         tf_markers = []
-    #         for line in reader:
-    #             if line[2] in tf_keep and line[5] == self.marker_name:
-    #                 with contextlib.suppress(IndexError):
-    #                     if ";" in line[10]:
-    #                         genes = line[10].split(";")
-    #                         for gene in genes:
-    #                             if line[2] == "I Marker":
-    #                                 tf_markers.append((gene, line[1]))
-    #                             else:
-    #                                 tf_markers.append((line[1], gene))
-    #                     elif line[2] == "I Marker":
-    #                         tf_markers.append((line[10], line[1]))
-    #                     else:
-    #                         tf_markers.append((line[1], line[10]))
-
-    #     for tup in tf_markers:
-    #         if (
-    #             tup[0] in self.genesymbol_to_gencode.keys()
-    #             and tup[1] in self.genesymbol_to_gencode.keys()
-    #         ):
-    #             yield (
-    #                 f"{self.genesymbol_to_gencode[tup[0]]}{self.tf_extension}",
-    #                 self.genesymbol_to_gencode[tup[1]],
-    #                 # -1,
-    #                 "tf_marker",
-    #             )
-
     def _tfbinding_footprints(
         self,
         tfbinding_file: str,
@@ -406,11 +361,6 @@ class EdgeParser:
                 / self.interaction_files["tfbinding"],
                 footprint_file=self.local_dir / self.shared["footprints"],
             )
-        # if "tf_marker" in self.interaction_types:
-        #     tf_generator = self._tf_markers(
-        #         interaction_file=self.interaction_dir
-        #         / self.interaction_files["tf_marker"],
-        #     )
 
         return (
             mirna_generator,
