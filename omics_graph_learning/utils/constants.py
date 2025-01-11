@@ -189,12 +189,12 @@ REGULATORY_ELEMENTS: Dict[str, Dict[str, str]] = {
     "union": {
         "enhancer": "enhancer_all_union_hg38.bed",
         "promoter": "promoter_all_union_hg38.bed",
-        "dyadic": "DYADIC_masterlist_locations._lifted_hg38.bed",
+        "dyadic": "DYADIC_masterlist_locations.lifted_hg38.bed",
     },
     "epimap": {
-        "enhancer": "ENH_masterlist_locations._lifted_hg38.bed",
-        "promoter": "PROM_masterlist_locations._lifted_hg38.bed",
-        "dyadic": "DYADIC_masterlist_locations._lifted_hg38.bed",
+        "enhancer": "ENH_masterlist_locations.lifted_hg38.bed",
+        "promoter": "PROM_masterlist_locations.lifted_hg38.bed",
+        "dyadic": "DYADIC_masterlist_locations.lifted_hg38.bed",
     },
     "encode": {
         "enhancer": "GRCh38-ELS.bed",

@@ -23,25 +23,98 @@ set -x
 module load anaconda3/2022.10
 conda activate /ocean/projects/bio210019p/stevesho/ogl
 
+# best so far
+# regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads
 
-# BEST PERFORMING
-# /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/models/regulatory_only_k562_allcontacts_global_gat_2layers_200dim_4attnheads
-# regulatory_only_k562_allloopshicfdr_global_UniMPTransformer_2layers_200dim
-# regulatory_only_imr90_allcontacts_global/run_3/performance.png
-# regulatory_only_hepg2_esc_allcontacts_global/run_3/performance.png
-# regulatory_only_h1_esc_allcontacts_global/run_3/performance.png
-# regulatory_only_gm12878_allcontacts_global/run_3/performance.png
 
-#  create mode 100644 configs/experiments/aorta_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/hippocampus_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/left_ventricle_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/liver_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/lung_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/mammary_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/pancreas_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/skeletal_muscle_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/skin_allcontacts_global.yaml
-#  create mode 100644 configs/experiments/small_intestine_allcontacts_global.yaml
+# submit model with base-graph only
+# --graph_type base
+configs=(k562_allcontacts_global_localonly.yaml)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/"${config}" \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --model_name k562_allcontacts_global_localonly
+done
+
+# submit model with gene-gene interactions
+# gene-gene in config
+configs=(k562_allcontacts_global_localonly.yaml)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/"${config}" \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --model_name k562_allcontacts_global_gene_gene
+done
+
+# submit models with regulatory schemas
+# encode
+# epimap
+# k562_allcontacts_global_epimap
+configs=(epimap encode)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global_"${config}" \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --model_name k562_allcontacts_global_"${config}"
+done
+
+# submit model with interaction feats
+# tfmarker
+# tfbinding
+# mirna
+# rbp network
+
+# submit model with adding different node types
+# cpgislands
+# crms
+# ctcfccre
+# superenahcners (check that these are in graph construction too)
+# tfbindingsites
+# tss annotations 
+
 
 
 # re-run all non k562 models, and try running new tissue models
