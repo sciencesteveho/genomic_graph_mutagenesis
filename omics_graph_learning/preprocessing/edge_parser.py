@@ -206,7 +206,11 @@ class EdgeParser:
         return (
             self._add_slop_window(bedtools_objects["enhancer"], ANCHOR_GRACE),
             self._add_slop_window(bedtools_objects["promoter"], ANCHOR_GRACE),
-            self._add_slop_window(bedtools_objects["dyadic"], ANCHOR_GRACE),
+            (
+                self._add_slop_window(bedtools_objects["dyadic"], ANCHOR_GRACE)
+                if bedtools_objects["dyadic"]
+                else None
+            ),
         )
 
     @time_decorator(print_args=True)
@@ -382,15 +386,19 @@ class EdgeParser:
             writer = csv.writer(output, delimiter="\t")
             writer.writerow(edge)
 
-    def _prepare_interaction_generators(self):
+    def _prepare_interaction_generators(self) -> Tuple[Generator, Generator, Generator]:
         """Initiate interaction type generators"""
-        mirna_generator = tf_generator = tfbinding_generator = iter([])
+        mirna_generator = rbp_generator = tfbinding_generator = iter([])
 
         if "mirna" in self.interaction_types:
             mirna_generator = self._mirna_targets(
                 target_list=self.interaction_dir / "active_mirna_{self.tissue}.txt",
                 tissue_active_mirnas=self.interaction_dir
                 / self.interaction_files["mirdip"],
+            )
+        if "rbp" in self.interaction_types:
+            rbp_generator = self._rbp_network(
+                tpm_filter=self.experiment_config.tpm_filter
             )
         if "tfbinding" in self.interaction_types:
             tfbinding_generator = self._tfbinding_footprints(
@@ -405,8 +413,8 @@ class EdgeParser:
         #     )
 
         return (
-            tf_generator,
-            circuit_generator,
+            mirna_generator,
+            rbp_generator,
             tfbinding_generator,
         )
 
@@ -602,6 +610,7 @@ class EdgeParser:
         p vs e, d, p
         e vs e, d
         """
+
         # Load elements
         all_enhancers, promoters, dyadic = self._prepare_regulatory_elements()
         self.tss = self._load_tss()
@@ -612,13 +621,19 @@ class EdgeParser:
         overlaps = [
             (self.tss, all_enhancers, "g_e"),
             (self.tss, promoters, "g_p"),
-            (self.tss, dyadic, "g_d"),
             (promoters, all_enhancers, "p_e"),
-            (promoters, dyadic, "p_d"),
             (promoters, promoters, "p_p"),
             (all_enhancers, all_enhancers, "e_e"),
+        ]
+
+        dyadic_contacts = [
+            (self.tss, dyadic, "g_d"),
+            (promoters, dyadic, "p_d"),
             (all_enhancers, dyadic, "e_d"),
         ]
+
+        if dyadic is not None:
+            overlaps += dyadic_contacts
 
         with contextlib.suppress(TypeError):
             if "superenhancers" in self.interaction_types:

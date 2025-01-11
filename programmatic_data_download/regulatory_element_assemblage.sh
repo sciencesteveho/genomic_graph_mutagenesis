@@ -165,6 +165,7 @@ function _make_ref_for_regulatory_elements () {
         ${reg_dir}/GRCh38-PLS.bed \
         | sort -k1,1 -k2,2n \
         | uniq \
+        | sort -k1,1 -k2,2n \
         > ${reference_dir}/regulatory_elements_encode_node_attr.bed
 
     # epimap only
@@ -174,6 +175,7 @@ function _make_ref_for_regulatory_elements () {
         ${reg_dir}/DYADIC_masterlist_locations.lifted_hg38.bed \
         | sort -k1,1 -k2,2n \
         | uniq \
+        | sort -k1,1 -k2,2n \
         > ${reference_dir}/regulatory_elements_epimap_node_attr.bed
 
     # intersect
@@ -183,6 +185,7 @@ function _make_ref_for_regulatory_elements () {
         ${reg_dir}/promoter_epimap_screen_overlap.bed \
         | sort -k1,1 -k2,2n \
         | uniq \
+        | sort -k1,1 -k2,2n \
         > ${reference_dir}/regulatory_elements_intersect_node_attr.bed
 
     # union
@@ -192,6 +195,7 @@ function _make_ref_for_regulatory_elements () {
         ${reg_dir}/promoter_all_union_hg38.bed \
         | sort -k1,1 -k2,2n \
         | uniq \
+        | sort -k1,1 -k2,2n \
         > ${reference_dir}/regulatory_elements_union_node_attr.bed
 }
 
