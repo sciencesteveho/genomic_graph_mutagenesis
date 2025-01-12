@@ -172,6 +172,10 @@ class GNNTrainer:
         # forward pass
         mask = data.train_mask_loss
 
+        # if for a given seed, the mask is empty, skip the batch
+        if mask.sum() == 0:
+            return 0.0, 0.0, 0.0
+
         (
             loss,
             regression_loss,
