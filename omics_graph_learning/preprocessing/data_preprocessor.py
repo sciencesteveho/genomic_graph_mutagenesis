@@ -210,18 +210,7 @@ class GenomeDataPreprocessor:
     @time_decorator(print_args=True)
     def _tf_binding_sites(self, bed: str) -> None:
         """Parse tissue-specific transcription factor binding sites Vierstra et
-        al., Nature, 2020, or from Funk et al., Cell Reports, 2020. Funk et al.,
-        footprints are 20-seed HINT TFs with score > 200 and use the locations
-        of the motifs, not the footprints, as HINT footprints are motif
-        agnostic. Motifs are merged to form tf-binding clusters (within 46bp,
-        from Chen et al., Scientific Reports, 2015). Vierstra et al., footprints
-        are FPR thresholded with p value < 0.001. Footprints within 46bp are
-        merged to form clusters, and then intersected with collapsed motifs. If
-        90% of the collapsed motif falls within the cluster, the cluster is
-        annotated with the binding motif.
-
-        ** Removed clustering of Funk binding sites. The commented code is
-        deprecated. **
+        al., Nature, 2020.
         """
         cmd = f"awk -v FS='\t' -v OFS='\t' '{{print $1, $2, $3, \"footprint\"}}' {self.tissue_dir}/unprocessed/{bed} \
             > {self.tissue_dir}/local/tfbindingsites_{self.tissue}.bed"

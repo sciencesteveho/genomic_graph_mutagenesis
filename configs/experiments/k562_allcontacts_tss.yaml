@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: regulatory_only_k562_allcontacts_global
+experiment_name: regulatory_only_k562_allcontacts_tss
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 
@@ -52,6 +52,7 @@ log_transform: log2
 
 nodes:
   - tads
+  - tss
 
 onehot_node_feats: 2
 

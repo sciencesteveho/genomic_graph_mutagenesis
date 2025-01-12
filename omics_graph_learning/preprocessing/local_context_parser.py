@@ -226,12 +226,9 @@ class LocalContextParser:
             Cpgislands add prefix to feature names  # enhancers,
             Histones add an additional column
             """
-            simple_rename = [
-                "cpgislands",
-                "crms",
-            ]
+            simple_rename = ["cpgislands", "crms", "superenhancers", "tfbindingsites"]
             if prefix in simple_rename:
-                feature = extend_fields(feature, 4)
+                # feature = extend_fields(feature, 4)
                 feature[3] = f"{feature[0]}_{feature[1]}_{prefix}"
             else:
                 # ensure feat does not already have chr_start

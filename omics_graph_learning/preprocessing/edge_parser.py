@@ -232,7 +232,7 @@ class EdgeParser:
 
     def _rbp_network(
         self,
-        tpm_filter: int = 10,
+        tpm_filter: int = 2,
         # ) -> Generator[Tuple[str, str, float, str], None, None]:
     ) -> Generator[Tuple[str, str, str], None, None]:
         """Filters RBP interactions based on tpm filter, derived from POSTAR3"""
@@ -310,31 +310,24 @@ class EdgeParser:
             writer = csv.writer(output, delimiter="\t")
             writer.writerow(edge)
 
-    def _prepare_interaction_generators(self) -> Tuple[Generator, Generator, Generator]:
+    def _prepare_interaction_generators(self) -> Tuple[Generator, Generator]:
         """Initiate interaction type generators"""
-        mirna_generator = rbp_generator = tfbinding_generator = iter([])
+        mirna_generator = rbp_generator = iter([])
 
         if "mirna" in self.interaction_types:
             mirna_generator = self._mirna_targets(
                 target_list=self.interaction_dir / "active_mirna_{self.tissue}.txt",
                 tissue_active_mirnas=self.interaction_dir
-                / self.interaction_files["mirdip"],
+                / f"active_mirna_{self.tissue}.txt",
             )
         if "rbp" in self.interaction_types:
             rbp_generator = self._rbp_network(
                 tpm_filter=self.experiment_config.tpm_filter
             )
-        if "tfbinding" in self.interaction_types:
-            tfbinding_generator = self._tfbinding_footprints(
-                tfbinding_file=self.shared_interaction_dir
-                / self.interaction_files["tfbinding"],
-                footprint_file=self.local_dir / self.shared["footprints"],
-            )
 
         return (
             mirna_generator,
             rbp_generator,
-            tfbinding_generator,
         )
 
     def _add_node_coordinates(
@@ -375,16 +368,8 @@ class EdgeParser:
             A list of deduplicated nodes (separate lists for genes and for miRNAs)
         """
 
-        def _run_generator(generator):
-            attr_refs = [self.gencode_attr_ref, self.gencode_attr_ref]
-            self._run_generator_common(generator, attr_refs)
-
         def _run_mirna_generator(generator):
             attr_refs = [self.mirna_ref, self.gencode_attr_ref]
-            self._run_generator_common(generator, attr_refs)
-
-        def _run_tfbinding_generator(generator):
-            attr_refs = [self.gencode_attr_ref, self.footprint_ref]
             self._run_generator_common(generator, attr_refs)
 
         if self._check_if_interactions_exists():
@@ -392,12 +377,10 @@ class EdgeParser:
             (
                 mirna_generator,
                 rbp_generator,
-                tfbinding_generator,
             ) = self._prepare_interaction_generators()
 
             # run generators!
             _run_mirna_generator(mirna_generator)
-            _run_tfbinding_generator(tfbinding_generator)
 
     def _overlap_groupby(
         self,
@@ -553,7 +536,7 @@ class EdgeParser:
         with contextlib.suppress(TypeError):
             if "superenhancers" in self.interaction_types:
                 super_enhancers = BedTool(
-                    self.local_dir / "superenhancers_{self.tissue}.bed"
+                    self.local_dir / f"superenhancers_{self.tissue}.bed"
                 )
                 overlaps += [
                     (self.tss, super_enhancers, "g_se"),

@@ -247,7 +247,7 @@ function _mirtarbase_targets () {
 # miRBase catalog, we remove unceccessary information and only keep the
 # coordinates and name (casefolded). Because there are some repeat entrys
 # (primary transcript vs gene body), we collapse any redundant mirnas by keeping
-# the larger coordinates. Of not, 66 miRNAs had multiple annotations on
+# the larger coordinates. Of note, 66 miRNAs had multiple annotations on
 # disparate chromosomes. We removed these 66 miRNA from our analysis. To convert
 # between miRNA IDs and ENSG identifiers, we create a lookup table with
 # coordinates from biomart.
