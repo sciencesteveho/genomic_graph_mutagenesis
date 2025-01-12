@@ -59,11 +59,6 @@ class EdgeParser:
     _mirna_targets:
         Filters all miRNA -> target interactions from miRTarBase and only keeps
         the miRNAs that are active in the given tissue from mirDIP.
-    _tf_markers:
-        Filters TF markers based on specific conditions.
-    _tfbinding_footprints:
-        Create edges based on whether or not known TF binding from Meuleman et
-        al. overlap footprints from Vierstra et al.
     _load_tss:
         Load TSS file and ignore any TSS that do not have a gene target.
     _process_graph_edges:
@@ -284,32 +279,6 @@ class EdgeParser:
                         "mirna",
                     )
 
-    def _tfbinding_footprints(
-        self,
-        tfbinding_file: str,
-        footprint_file: str,
-        # ) -> Generator[Tuple[str, str, float, str], None, None]:
-    ) -> Generator[Tuple[str, str, str], None, None]:
-        """Create edges based on whether or not known TF binding from Meuleman
-        et al. overlap footprints from Vierstra et al.
-
-        Args:
-            tfbinding_file (str): shared tf binding locations from Meuleman
-            footprint_file (str): tissue-specific footprints from Vierstra
-
-        Returns:
-            List[Tuple[str, str, float, str]]
-        """
-        tf_binding = self._remove_blacklist(BedTool(tfbinding_file))
-        tf_edges = tf_binding.intersect(footprint_file, wb=True)
-        for line in tf_edges:
-            yield (
-                f"{self.genesymbol_to_gencode[line[3]]}_tf",
-                f"{line[5]}_{line[6]}_{line[3]}",
-                # -1,
-                "tf_binding_footprint",
-            )
-
     # def _check_tss_gene_in_gencode(self, tss: str) -> bool:
     #     """Check if gene associated with TSS is in gencode v26"""
     #     gene = tss.split("_")[5]
@@ -421,16 +390,12 @@ class EdgeParser:
         if self._check_if_interactions_exists():
             # get generators
             (
-                ppi_generator,
                 mirna_generator,
-                tf_generator,
-                circuit_generator,
+                rbp_generator,
                 tfbinding_generator,
             ) = self._prepare_interaction_generators()
 
             # run generators!
-            for gen in [ppi_generator, tf_generator, circuit_generator]:
-                _run_generator(gen)
             _run_mirna_generator(mirna_generator)
             _run_tfbinding_generator(tfbinding_generator)
 

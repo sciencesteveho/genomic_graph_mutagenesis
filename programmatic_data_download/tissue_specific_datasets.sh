@@ -182,6 +182,13 @@ _tf_binding_footprints() {
 
 
 # =============================================================================
+# Download the coordinations of DHSs with evidence of being bound by TFs from
+# Meuleman, et al 2020. We concatenate the files, keeping the first 3 columns,
+# and adding the TF name as the 4th column.
+# =============================================================================
+
+
+# =============================================================================
 # Download superenhancers from SeDB and save to the tissue directory.
 # =============================================================================
 _sedb() {
