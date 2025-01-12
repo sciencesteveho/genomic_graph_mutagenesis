@@ -33,11 +33,11 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 # superenahcners (check that these are in graph construction too)
 # tfbindingsites
 # tss annotations 
-configs=(cpgislands crms ctcfccre superenhancers tfbindingsites tss)
+configs=(cpgislands crms ctcf superenhancers tfbindingsites tss)
 for config in "${configs[@]}"; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
-    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global_"${config}".yaml \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_"${config}".yaml \
     --target rna_seq \
     --model GAT \
     --gnn_layers 2 \

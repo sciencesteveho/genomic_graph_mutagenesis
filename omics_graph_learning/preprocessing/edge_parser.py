@@ -150,12 +150,9 @@ class EdgeParser:
         self.se_ref = self._create_reference_dict(
             self.attribute_references["super_enhancers"]
         )
-        self.mirna_ref = self._create_reference_dict(
-            self.attribute_references["mirna"], use_col_4_idx=True
-        )
-        self.footprint_ref = self._create_reference_dict(
-            self.attribute_references["tf_motifs"]
-        )
+        # self.mirna_ref = self._create_reference_dict(
+        #     self.attribute_references["mirna"], use_col_4_idx=True
+        # )
 
     def _create_reference_dict(
         self, file: str, use_col_4_idx: bool = False
