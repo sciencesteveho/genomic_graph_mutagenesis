@@ -67,8 +67,6 @@ positional_encoding:
 
 rbp_network: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_network.txt
 
-rbp_proteins: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_proteins.txt
-
 regulatory_schema: intersect
 
 root_dir: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing
