@@ -150,9 +150,9 @@ class EdgeParser:
         self.se_ref = self._create_reference_dict(
             self.attribute_references["super_enhancers"]
         )
-        # self.mirna_ref = self._create_reference_dict(
-        #     self.attribute_references["mirna"], use_col_4_idx=True
-        # )
+        self.mirna_ref = self._create_reference_dict(
+            self.attribute_references["mirna"], use_col_4_idx=True
+        )
 
     def _create_reference_dict(
         self, file: str, use_col_4_idx: bool = False
@@ -230,27 +230,19 @@ class EdgeParser:
     def _rbp_network(
         self,
         tpm_filter: int = 2,
-        # ) -> Generator[Tuple[str, str, float, str], None, None]:
     ) -> Generator[Tuple[str, str, str], None, None]:
         """Filters RBP interactions based on tpm filter, derived from POSTAR3"""
         rbp_network_obj = RBPNetworkFilter(
-            rbp_proteins=self.experiment_config.rbp_proteins,
-            gencode=self.gencode,
             network_file=self.experiment_config.rbp_network,
-            tpm_filter=tpm_filter,
             rna_seq_file=self.tissue_config.resources["rna"],
+            tpm_filter=tpm_filter,
         )
         rbp_network_obj.filter_rbp_network()
-
-        # save gene list to file
-        with open(self.interaction_dir / "active_rbps.pkl", "wb") as file:
-            pickle.dump(rbp_network_obj.active_rbps, file)
 
         for tup in rbp_network_obj.filtered_network:
             yield (
                 tup[0],
                 tup[1],
-                # -1,
                 "rbp",
             )
 
@@ -261,25 +253,24 @@ class EdgeParser:
     ) -> Generator[Tuple[str, str, str], None, None]:
         """Filters all miRNA -> target interactions from miRTarBase and based on
         the active miRNAs in the given tissue.
+
+        Sample-specific miRNA are derived from ENCODE miRNA-seq data.
+        miRNA --> target interactions are derived from miRTarBase.
+        miRNA coordinates are derived from miRBase.
         """
         with open(tissue_active_mirnas, newline="") as file:
             active_mirna = set(csv.reader(file, delimiter="\t"))
 
         with open(target_list, newline="") as file:
             target_reader = csv.reader(file, delimiter="\t")
+            next(target_reader)
             for line in target_reader:
                 if line[0] in active_mirna and line[1] in self.genesymbol_to_gencode:
                     yield (
                         line[0],
                         self.genesymbol_to_gencode[line[1]],
-                        # -1,
                         "mirna",
                     )
-
-    # def _check_tss_gene_in_gencode(self, tss: str) -> bool:
-    #     """Check if gene associated with TSS is in gencode v26"""
-    #     gene = tss.split("_")[5]
-    #     return self.genesymbol_to_gencode.get(gene, False)
 
     def _write_noderef_combination(self, node: str) -> None:
         """Writes chr, start, stop, node to a file. Gets coords from ref
@@ -369,6 +360,10 @@ class EdgeParser:
             attr_refs = [self.mirna_ref, self.gencode_attr_ref]
             self._run_generator_common(generator, attr_refs)
 
+        def _run_rbp_generator(generator):
+            attr_refs = [self.gencode_attr_ref, self.gencode_attr_ref]
+            self._run_generator_common(generator, attr_refs)
+
         if self._check_if_interactions_exists():
             # get generators
             (
@@ -378,6 +373,7 @@ class EdgeParser:
 
             # run generators!
             _run_mirna_generator(mirna_generator)
+            _run_rbp_generator(rbp_generator)
 
     def _overlap_groupby(
         self,

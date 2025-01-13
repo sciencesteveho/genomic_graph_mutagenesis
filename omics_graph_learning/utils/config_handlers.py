@@ -63,7 +63,6 @@ class ExperimentConfig:
     log_transform: str
     nodes: List[str]
     onehot_node_feats: int
-    rbp_proteins: str
     rbp_network: str
     regulatory_schema: str
     root_dir: Path

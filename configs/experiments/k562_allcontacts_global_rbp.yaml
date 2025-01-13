@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: regulatory_only_k562_allcontacts_global
+experiment_name: k562_allcontacts_global_rbp
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 
@@ -40,7 +40,8 @@ gene_gene: false
 
 graph_type: full
 
-interaction_types: null
+interaction_types:
+  - rbp
 
 k_fold: null
 

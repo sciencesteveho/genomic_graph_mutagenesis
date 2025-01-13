@@ -26,11 +26,36 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 # best so far
 # regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads
 
+# submit interaction types, mirna and rbp
+configs=(mirna rbp)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_"${config}".yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --model_name k562_allcontacts_global_"${config}"
+done
+
 
 ### Notes
 # potentially beneficial node types
 # ctcf, cpgislands, tfbindingsites
-# replicate best model
+# all node types
+# ctcf, cpgislands, tss, tfbindingsites, crms, se
+
 configs=(add_nodes all_nodes)
 for config in "${configs[@]}"; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
@@ -53,10 +78,6 @@ for config in "${configs[@]}"; do
     --model_name k562_allcontacts_global_"${config}"
 done
 
-# all node types
-# ctcf, cpgislands, tss, tfbindingsites, crms, se
-
-
 # replicate best model
 python ogl/omics_graph_learning/ogl_pipeline.py \
   --partition RM \
@@ -75,7 +96,7 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
   --residual distinct_source \
   --heads 2 \
   --positional_encoding \
-  --model_name k562_allcontacts_global_replicate
+  --model_name k562_allcontacts_global_replicate_2
 
 # submit model with adding different node types
 # cpgislands

@@ -253,7 +253,9 @@ class GenomeDataPreprocessor:
     def _normalize_mirna(self, file: str) -> None:
         """CPM (counts per million) normalization for miRNA-seq counts"""
         # get miRNA reference
-        mirnaref = _mirna_ref(self.attribute_references["mirna"])
+        mirnaref = _mirna_ref(
+            f"{self.reference_dir}/{self.attribute_references['mirna']}"
+        )
 
         mirna = pd.read_csv(
             file,
@@ -421,9 +423,7 @@ class GenomeDataPreprocessor:
 
         # parse active miRNAs from raw data
         if "mirna" in self.nodes:
-            self._normalize_mirna(
-                f"{self.tissue_dir}/unprocessed/{self.interaction['mirna']}"
-            )
+            self._normalize_mirna(f"{self.data_dir}/{self.interaction['mirna']}")
 
     @staticmethod
     def _count_per_million(df: pd.DataFrame) -> pd.DataFrame:
