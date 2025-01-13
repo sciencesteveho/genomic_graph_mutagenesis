@@ -26,6 +26,37 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 # best so far
 # regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads
 
+
+### Notes
+# potentially beneficial node types
+# ctcf, cpgislands, tfbindingsites
+# replicate best model
+configs=(add_nodes all_nodes)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_"${config}".yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --model_name k562_allcontacts_global_"${config}"
+done
+
+# all node types
+# ctcf, cpgislands, tss, tfbindingsites, crms, se
+
+
 # replicate best model
 python ogl/omics_graph_learning/ogl_pipeline.py \
   --partition RM \
@@ -74,15 +105,6 @@ for config in "${configs[@]}"; do
     --positional_encoding \
     --model_name k562_allcontacts_global_"${config}"
 done
-
-
-# submit model with interaction feats
-# tfmarker
-# tfbinding
-# mirna
-# rbp network
-
-
 
 # submit model with base-graph only
 # --graph_type base
