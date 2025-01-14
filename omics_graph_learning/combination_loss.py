@@ -18,7 +18,7 @@ class CombinationLoss(nn.Module):
     classification.
 
     Attributes:
-        alpha (float): weighting factor for the primary task (default: 0.85)
+        alpha (float): weighting factor for the primary task (default: 0.90)
         regression_loss_type (str): type of regression loss (default: 'rmse')
 
     Methods
@@ -39,7 +39,7 @@ class CombinationLoss(nn.Module):
     >>> optimizer.step()
     """
 
-    def __init__(self, alpha=0.85, regression_loss_type: str = "rmse") -> None:
+    def __init__(self, alpha=0.90, regression_loss_type: str = "rmse") -> None:
         """Initialize the custom loss function."""
         super(CombinationLoss, self).__init__()
         if not (0.0 <= alpha <= 1.0):

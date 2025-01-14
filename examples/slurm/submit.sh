@@ -25,6 +25,26 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 # best so far
 # regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads, as well as _replicate and _replicate_2
+for rep in 0 1 2; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --model_name K562_release_rep_"${rep}"
+done
 
 cd /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/experiments && rm -r k562_allcontacts_global_mirna k562_allcontacts_global_rbp && cd - 
 
