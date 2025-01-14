@@ -246,6 +246,7 @@ class PipelineRunner:
             f"--dropout {args.dropout} "
             f"--split_name {split_name} "
             f"--run_number {run_number} "
+            f"--alpha {args.alpha} "
             f"--model_name {args.model_name} "
         )
 

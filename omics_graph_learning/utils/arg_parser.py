@@ -222,6 +222,7 @@ class OGLCLIParser:
         self.parser.add_argument(
             "--device", type=int, default=0, help="which gpu to use if any (default: 0)"
         )
+        self.parser.add_argument("--alpha", type=float, default=0.85)
 
     @staticmethod
     def _validate_args(args: argparse.Namespace) -> None:

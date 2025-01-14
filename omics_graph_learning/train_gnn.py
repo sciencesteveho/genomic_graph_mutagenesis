@@ -93,6 +93,7 @@ class GNNTrainer:
         device: torch.device,
         data: torch_geometric.data.Data,
         regression_loss_type: Optional[str] = "rmse",
+        alpha: Optional[float] = 0.85,
         optimizer: Optional[Optimizer] = None,
         scheduler: Optional[Union[LRScheduler, ReduceLROnPlateau]] = None,
         logger: Optional[logging.Logger] = None,
@@ -109,7 +110,7 @@ class GNNTrainer:
         self.tb_logger = tb_logger
 
         self.criterion = CombinationLoss(
-            alpha=0.85, regression_loss_type=regression_loss_type
+            alpha=alpha, regression_loss_type=regression_loss_type
         )
 
     def _forward_pass(
@@ -898,6 +899,7 @@ def main() -> None:
         device=device,
         data=data,
         regression_loss_type=args.regression_loss_type,
+        alpha=args.alpha,
         optimizer=optimizer,
         scheduler=scheduler,
         logger=logger,
