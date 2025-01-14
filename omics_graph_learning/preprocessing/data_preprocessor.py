@@ -234,7 +234,7 @@ class GenomeDataPreprocessor:
     def _normalize_mirna(self, file: str) -> None:
         """CPM (counts per million) normalization for miRNA-seq counts"""
         # get miRNA reference
-        mirnaref = _mirna_ref(self.reference_dir / self.attribute_references["mirna"])
+        mirnaref = _mirna_ref(self.attribute_references["mirna"])
 
         mirna = pd.read_csv(
             file,

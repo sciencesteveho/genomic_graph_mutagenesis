@@ -9,7 +9,6 @@ import contextlib
 import csv
 import os
 from pathlib import Path
-import pickle
 from typing import (
     Callable,
     Dict,
@@ -229,13 +228,11 @@ class EdgeParser:
 
     def _rbp_network(
         self,
-        tpm_filter: int = 2,
     ) -> Generator[Tuple[str, str, str], None, None]:
         """Filters RBP interactions based on tpm filter, derived from POSTAR3"""
         rbp_network_obj = RBPNetworkFilter(
             network_file=self.experiment_config.rbp_network,
             rna_seq_file=self.tissue_config.resources["rna"],
-            tpm_filter=tpm_filter,
         )
         rbp_network_obj.filter_rbp_network()
 
@@ -259,7 +256,7 @@ class EdgeParser:
         miRNA coordinates are derived from miRBase.
         """
         with open(tissue_active_mirnas, newline="") as file:
-            active_mirna = set(csv.reader(file, delimiter="\t"))
+            active_mirna = {row[0] for row in csv.reader(file, delimiter="\t")}
 
         with open(target_list, newline="") as file:
             target_reader = csv.reader(file, delimiter="\t")
@@ -304,7 +301,7 @@ class EdgeParser:
 
         if "mirna" in self.interaction_types:
             mirna_generator = self._mirna_targets(
-                target_list=self.interaction_dir / "active_mirna_{self.tissue}.txt",
+                target_list=self.attribute_references["mirnatargets"],
                 tissue_active_mirnas=self.interaction_dir
                 / f"active_mirna_{self.tissue}.txt",
             )
@@ -333,7 +330,8 @@ class EdgeParser:
 
         Args:
             generator (Generator): The generator to run.
-            attr_refs (List[Dict[str, List[str]], Dict[str, List[str]]]): The attribute references.
+            attr_refs (List[Dict[str, List[str]], Dict[str, List[str]]]): The
+            attribute references.
         """
         for result in generator:
             self._write_edges(result)
