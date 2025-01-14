@@ -57,6 +57,7 @@ class RBPNetworkFilter:
         self.ref_rbp = {
             line[0] for line in csv.reader(open(network_file), delimiter="\t")
         }
+        print(f"Number of reference RBPs: {len(self.ref_rbp)}")
 
     def filter_rbp_network(self) -> None:
         """Get RBP network."""
@@ -65,15 +66,18 @@ class RBPNetworkFilter:
         rna_exp = self._read_encode_rna_seq_data(self.rna_seq_file)
         rbp_df = rna_exp[rna_exp.index.isin(self.ref_rbp)]
         active_rbp = rbp_df[rbp_df["TPM"] >= self.tpm_filter]
+        print(f"Number of active RBPs: {len(active_rbp)}")
 
         # filter network based on active rbps
         rbp_network = [
             [line[0], line[1]]
             for line in csv.reader(open(self.network_file), delimiter="\t")
         ]
+        print(f"Number of edges in network: {len(rbp_network)}")
 
         # final TPM filtered network and attributes
         self.filtered_network = [edge for edge in rbp_network if edge[0] in active_rbp]
+        print(f"Number of edges in filtered network: {len(self.filtered_network)}")
 
     def _read_encode_rna_seq_data(
         self,

@@ -262,12 +262,14 @@ class EdgeParser:
             active_mirna = {row[0] for row in csv.reader(file, delimiter="\t")}
 
         logger.info(f"Found {len(active_mirna)} active miRNAs.")
+        print(f"{active_mirna}")
 
         count = 0
         with open(target_list, newline="") as file:
             target_reader = csv.reader(file, delimiter="\t")
-            next(target_reader)
             for line in target_reader:
+                print(f"line[0]: {line[0]}")
+                print(f"line[1]: {line[1]}")
                 if line[0] in active_mirna and line[1] in self.genesymbol_to_gencode:
                     yield (
                         line[0],

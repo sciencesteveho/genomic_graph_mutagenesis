@@ -236,9 +236,11 @@ function _mirtarbase_targets () {
             | sed 's/,/\t/g' \
             | awk -vFS='\t' '$3 == "Homo sapiens" && $4 ~ /Functional/' \
             | cut -f1,2 \
+            | sed 's/-[0-9]p\t/\t/' \
+            | tail -n +2 \
             | sort -u
     } > ${parsed_mirtarbase}
-}
+
 
 
 # =============================================================================
