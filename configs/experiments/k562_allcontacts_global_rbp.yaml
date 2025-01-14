@@ -60,7 +60,7 @@ positional_encoding:
   build_positional_encoding: true
   train_positional_encoding: false
 
-rbp_network: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_network.txt
+rbp_network: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_gene_network.txt
 
 regulatory_schema: intersect
 
