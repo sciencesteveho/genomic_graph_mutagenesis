@@ -24,7 +24,7 @@ module load anaconda3/2022.10
 conda activate /ocean/projects/bio210019p/stevesho/ogl
 
 # best so far
-# regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads
+# regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads, as well as _replicate and _replicate_2
 
 # submit interaction types, mirna and rbp
 configs=(mirna rbp)

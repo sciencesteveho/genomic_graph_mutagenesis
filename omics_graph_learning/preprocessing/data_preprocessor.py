@@ -140,32 +140,13 @@ class GenomeDataPreprocessor:
                 boolean=True,
             )
 
-        interact_files = {
-            # "circuits": f"{self.dirs['circuit_dir']}/{self.interaction['circuits']}",
-            # "ppis": f"{self.shared_data_dir}/interaction/{self.interaction['ppis']}",
-        }
-
-        with contextlib.suppress(TypeError):
-            if self.interaction_types is not None:
-                for datatype in self.interaction_types:
-                    if datatype == "mirna":
-                        check_and_symlink(
-                            src=self.shared_data_dir
-                            / "interaction"
-                            / self.interaction["mirnatargets"],
-                            dst=self.tissue_dir
-                            / "interaction"
-                            / self.interaction["mirnatargets"],
-                            boolean=True,
-                        )
-                    else:
-                        check_and_symlink(
-                            src=interact_files[datatype],
-                            dst=self.tissue_dir
-                            / "interaction"
-                            / self.interaction[datatype],
-                            boolean=False,
-                        )
+        # make a symlink for mirna
+        if "mirna" in self.interaction_types:
+            check_and_symlink(
+                src=self.data_dir / self.interaction["mirna"],
+                dst=self.tissue_dir / "unprocessed" / self.interaction["mirna"],
+                boolean=True,
+            )
 
     # def _download_shared_files(self) -> None:
     #     """Download shared local features if not already present"""
@@ -423,7 +404,8 @@ class GenomeDataPreprocessor:
 
         # parse active miRNAs from raw data
         if "mirna" in self.nodes:
-            self._normalize_mirna(f"{self.data_dir}/{self.interaction['mirna']}")
+            mirna_file = self.tissue_dir / "unprocessed" / self.interaction["mirna"]
+            self._normalize_mirna(mirna_file)
 
     @staticmethod
     def _count_per_million(df: pd.DataFrame) -> pd.DataFrame:
