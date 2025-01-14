@@ -277,7 +277,7 @@ class EdgeParser:
             )
         elif "superenhancer" in node:
             self._write_node_list(self._add_node_coordinates(node, self.se_ref))
-        elif "mir" in node:
+        elif "hsa-" in node:
             self._write_node_list(self._add_node_coordinates(node, self.mirna_ref))
         else:
             self._write_node_list(
