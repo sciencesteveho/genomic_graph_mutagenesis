@@ -181,6 +181,7 @@ class OGLCLIParser:
             type=int,
             help="Run number to specify for GNN training. If not specified, the pipeline will instead submit three jobs [0, 1, 2] and train three models across three seeds.",
         )
+        self.parser.add_argument("--alpha", type=float, default=0.85)
 
     def add_boolean_flags(self) -> None:
         """Add boolean flags to the parser."""
@@ -222,7 +223,6 @@ class OGLCLIParser:
         self.parser.add_argument(
             "--device", type=int, default=0, help="which gpu to use if any (default: 0)"
         )
-        self.parser.add_argument("--alpha", type=float, default=0.85)
 
     @staticmethod
     def _validate_args(args: argparse.Namespace) -> None:
