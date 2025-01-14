@@ -309,9 +309,7 @@ class EdgeParser:
                 / f"active_mirna_{self.tissue}.txt",
             )
         if "rbp" in self.interaction_types:
-            rbp_generator = self._rbp_network(
-                tpm_filter=self.experiment_config.tpm_filter
-            )
+            rbp_generator = self._rbp_network()
 
         return (
             mirna_generator,

@@ -403,7 +403,7 @@ class GenomeDataPreprocessor:
         self._merge_cpg(self.methylation["cpg"])
 
         # parse active miRNAs from raw data
-        if "mirna" in self.nodes:
+        if "mirna" in self.interaction_types:
             mirna_file = self.tissue_dir / "unprocessed" / self.interaction["mirna"]
             self._normalize_mirna(mirna_file)
 
