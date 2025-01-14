@@ -278,6 +278,8 @@ class EdgeParser:
         elif "superenhancer" in node:
             self._write_node_list(self._add_node_coordinates(node, self.se_ref))
         elif "hsa-" in node:
+            print(node)
+            print(self.mirna_ref)
             self._write_node_list(self._add_node_coordinates(node, self.mirna_ref))
         else:
             self._write_node_list(
@@ -327,7 +329,7 @@ class EdgeParser:
         generator: Generator,
         attr_refs: List[Dict[str, List[str]]],
     ) -> None:
-        """Runs a generator and processes its results. Returns nothing.
+        """Runs a generator and processes its results.
 
         Args:
             generator (Generator): The generator to run.
