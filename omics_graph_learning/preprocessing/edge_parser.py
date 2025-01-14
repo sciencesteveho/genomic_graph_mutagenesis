@@ -152,6 +152,7 @@ class EdgeParser:
         self.mirna_ref = self._create_reference_dict(
             self.attribute_references["mirna"], use_col_4_idx=True
         )
+        print(self.mirna_ref)
 
     def _create_reference_dict(
         self, file: str, use_col_4_idx: bool = False
@@ -338,11 +339,11 @@ class EdgeParser:
             attribute references.
         """
         for result in generator:
-            logger.info(f"Processing {result}")
+            logger.info(f"Processing generator result: {result}")
             self._write_edges(result)
             for element, attr_ref in zip(result, attr_refs):
                 coordinate = self._add_node_coordinates(element, attr_ref)
-                logger.info(f"Processing {coordinate}")
+                logger.info(f"Processing generator {coordinate}")
                 self._write_node_list(coordinate)
 
     def _check_if_interactions_exists(self) -> bool:
