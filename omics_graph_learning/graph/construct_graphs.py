@@ -138,10 +138,7 @@ class GraphConstructor:
                 ref_for_concat = pickle.load(file)
                 ref.update(ref_for_concat)
 
-        return {
-            key: {**value, **self._add_tf_or_gene_onehot(key)}
-            for key, value in ref.items()
-        }
+        return ref
 
     def _add_node_attributes(self, graph: nx.Graph) -> nx.Graph:
         """Add attributes to graph nodes."""
@@ -207,14 +204,6 @@ class GraphConstructor:
         """Remove self loops from the graph."""
         graph.remove_edges_from(nx.selfloop_edges(graph))
         return graph
-
-    @staticmethod
-    def _add_tf_or_gene_onehot(node: str) -> Dict[str, int]:
-        """Add one-hot encoding for TFs and genes."""
-        return {
-            "is_gene": int("_tf" not in node and "ENSG" in node),
-            "is_tf": int("_tf" in node),
-        }
 
     @staticmethod
     def _remove_blacklist_nodes(graph: nx.Graph) -> nx.Graph:

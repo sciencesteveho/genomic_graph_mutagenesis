@@ -62,7 +62,6 @@ class ExperimentConfig:
     liftover_chain: str
     log_transform: str
     nodes: List[str]
-    onehot_node_feats: int
     rbp_network: str
     regulatory_schema: str
     root_dir: Path

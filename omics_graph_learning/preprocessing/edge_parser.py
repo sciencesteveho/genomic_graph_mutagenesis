@@ -235,9 +235,6 @@ class EdgeParser:
             rna_seq_file=self.tissue_config.resources["rna"],
         )
         rbp_network_obj.filter_rbp_network()
-        print("Checking that RBP network is not empty")
-        print(rbp_network_obj.filtered_network[0])
-        print(rbp_network_obj.filtered_network[1])
 
         for tup in rbp_network_obj.filtered_network:
             yield (
@@ -261,23 +258,15 @@ class EdgeParser:
         with open(tissue_active_mirnas, newline="") as file:
             active_mirna = {row[0] for row in csv.reader(file, delimiter="\t")}
 
-        logger.info(f"Found {len(active_mirna)} active miRNAs.")
-        print(f"{active_mirna}")
-
-        count = 0
         with open(target_list, newline="") as file:
             target_reader = csv.reader(file, delimiter="\t")
             for line in target_reader:
-                print(f"line[0]: {line[0]}")
-                print(f"line[1]: {line[1]}")
                 if line[0] in active_mirna and line[1] in self.genesymbol_to_gencode:
                     yield (
                         line[0],
                         self.genesymbol_to_gencode[line[1]],
                         "mirna",
                     )
-                    count += 1
-        logger.info(f"Found {count} miRNA targets.")
 
     def _write_noderef_combination(self, node: str) -> None:
         """Writes chr, start, stop, node to a file. Gets coords from ref
@@ -288,6 +277,8 @@ class EdgeParser:
             )
         elif "superenhancer" in node:
             self._write_node_list(self._add_node_coordinates(node, self.se_ref))
+        elif "mir" in node:
+            self._write_node_list(self._add_node_coordinates(node, self.mirna_ref))
         else:
             self._write_node_list(
                 self._add_node_coordinates(node, self.regulatory_attr_ref)
@@ -310,17 +301,12 @@ class EdgeParser:
         mirna_generator = rbp_generator = iter([])
 
         if "mirna" in self.interaction_types:
-            print("mirna in self.interaction_types")
-            print(
-                f"Making mirna generator with {self.attribute_references['mirnatargets']} and {self.interaction_dir / f'active_mirna_{self.tissue}.txt'}"
-            )
             mirna_generator = self._mirna_targets(
                 target_list=self.attribute_references["mirnatargets"],
                 tissue_active_mirnas=self.interaction_dir
                 / f"active_mirna_{self.tissue}.txt",
             )
         if "rbp" in self.interaction_types:
-            print("rbp in self.interaction_types")
             rbp_generator = self._rbp_network()
 
         return (

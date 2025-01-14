@@ -61,9 +61,7 @@ def scale_graph(scaler_utility: ScalerUtils) -> Dict:
 
     # feats are set up so that the last_n are one-hot encoded, so we only scale
     # the continous feats
-    feat_range = _get_continuous_feat_range(
-        node_features=node_features, onehot_feats=scaler_utility.onehot_node_feats
-    )
+    feat_range = node_features.shape[1]  # total number of features
 
     # fit scalers!
     fit_scalers(
@@ -113,12 +111,6 @@ def test_and_val_genes(split: Dict[str, List[str]], idxs: Dict[str, int]) -> Lis
     """Exclude validation and test genes from fitting scalers"""
     exclude = split["validation"] + split["test"]
     return [idxs[gene] for gene in exclude if gene in idxs]
-
-
-def _get_continuous_feat_range(node_features: np.ndarray, onehot_feats: int) -> int:
-    """Subtract the number of onehot encoded features (at the end of the array)
-    from the total number of features"""
-    return node_features.shape[1] - onehot_feats
 
 
 def scaler_fit_task(scaler_fit_arguments: Tuple[int, np.ndarray, Path]) -> int:

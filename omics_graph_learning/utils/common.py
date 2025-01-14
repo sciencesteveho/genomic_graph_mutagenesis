@@ -486,7 +486,6 @@ class ScalerUtils:
         args = self._parse_args()
         self.experiment_config = ExperimentConfig.from_yaml(args.experiment_config)
         self.split_name = args.split_name
-        self.onehot_node_feats = self.experiment_config.onehot_node_feats
         self.file_prefix = f"{self.experiment_config.experiment_name}_{self.experiment_config.graph_type}"
 
         # directories
