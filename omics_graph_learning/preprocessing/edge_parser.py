@@ -271,6 +271,7 @@ class EdgeParser:
     def _write_noderef_combination(self, node: str) -> None:
         """Writes chr, start, stop, node to a file. Gets coords from ref
         dict."""
+        print(node)
         if "ENSG" in node:
             self._write_node_list(
                 self._add_node_coordinates(node, self.gencode_attr_ref)
@@ -337,9 +338,12 @@ class EdgeParser:
             attribute references.
         """
         for result in generator:
+            logger.info(f"Processing {result}")
             self._write_edges(result)
             for element, attr_ref in zip(result, attr_refs):
-                self._write_node_list(self._add_node_coordinates(element, attr_ref))
+                coordinate = self._add_node_coordinates(element, attr_ref)
+                logger.info(f"Processing {coordinate}")
+                self._write_node_list(coordinate)
 
     def _check_if_interactions_exists(self) -> bool:
         """Check if interaction edges file exists"""
