@@ -26,6 +26,10 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 # best so far
 # regulatory_k562_allcontacts-global_gat_2layers_dim_2attnheads, as well as _replicate and _replicate_2
 
+cd /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/experiments
+rm -r k562_allcontacts_global_mirna k562_allcontacts_global_rbp
+
+ogldir
 # submit interaction types, mirna and rbp
 configs=(mirna rbp)
 for config in "${configs[@]}"; do
