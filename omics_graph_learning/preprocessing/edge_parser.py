@@ -152,7 +152,6 @@ class EdgeParser:
         self.mirna_ref = self._create_reference_dict(
             self.attribute_references["mirna"], use_col_4_idx=True
         )
-        print(self.mirna_ref)
 
     def _create_reference_dict(
         self, file: str, use_col_4_idx: bool = False
@@ -272,7 +271,6 @@ class EdgeParser:
     def _write_noderef_combination(self, node: str) -> None:
         """Writes chr, start, stop, node to a file. Gets coords from ref
         dict."""
-        print(node)
         if "ENSG" in node:
             self._write_node_list(
                 self._add_node_coordinates(node, self.gencode_attr_ref)
@@ -280,8 +278,6 @@ class EdgeParser:
         elif "superenhancer" in node:
             self._write_node_list(self._add_node_coordinates(node, self.se_ref))
         elif "hsa-" in node:
-            print(node)
-            print(self.mirna_ref)
             self._write_node_list(self._add_node_coordinates(node, self.mirna_ref))
         else:
             self._write_node_list(
@@ -339,11 +335,9 @@ class EdgeParser:
             attribute references.
         """
         for result in generator:
-            logger.info(f"Processing generator result: {result}")
             self._write_edges(result)
             for element, attr_ref in zip(result, attr_refs):
                 coordinate = self._add_node_coordinates(element, attr_ref)
-                logger.info(f"Processing generator {coordinate}")
                 self._write_node_list(coordinate)
 
     def _check_if_interactions_exists(self) -> bool:
