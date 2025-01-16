@@ -265,6 +265,10 @@ class PipelineRunner:
                 train_args += f" --node_perturbation {args.node_perturbation}"
             if args.edge_perturbation:
                 train_args += f" --edge_perturbation {args.edge_perturbation}"
+            if args.randomize_node_feature_idx:
+                train_args += (
+                    f" --randomize_node_feature_idx {args.randomize_node_feature_idx}"
+                )
         return train_args + bool_flags
 
     def submit_gnn_job(self, split_name: str, dependency: Optional[str]) -> None:

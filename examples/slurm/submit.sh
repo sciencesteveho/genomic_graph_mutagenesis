@@ -23,9 +23,447 @@ set -x
 module load anaconda3/2022.10
 conda activate /ocean/projects/bio210019p/stevesho/ogl
 
+
+# Best release model so far
+# k562_release_best_params_GAT_dropout_0.1_smoothl1 
+
+# submit best model + randomized node features per idx
+
+# k562_release_all_nodes_and_interact.yaml
+python ogl/omics_graph_learning/ogl_pipeline.py \
+  --partition RM \
+  --experiment_yaml ogl/configs/experiments/k562_release_all_nodes_and_interact.yaml \
+  --target rna_seq \
+  --model GAT \
+  --gnn_layers 2 \
+  --linear_layers 2 \
+  --activation gelu \
+  --dimensions 200 \
+  --batch_size 32 \
+  --learning_rate 0.0005 \
+  --optimizer AdamW \
+  --scheduler cosine \
+  --dropout 0.1 \
+  --residual distinct_source \
+  --heads 2 \
+  --positional_encoding \
+  --regression_loss_type smooth_l1 \
+  --model_name k562_release_all_nodes_and_interact
+
+python ogl/omics_graph_learning/ogl_pipeline.py \
+  --partition RM \
+  --experiment_yaml ogl/configs/experiments/k562_release_all_interact.yaml \
+  --target rna_seq \
+  --model GAT \
+  --gnn_layers 2 \
+  --linear_layers 2 \
+  --activation gelu \
+  --dimensions 200 \
+  --batch_size 32 \
+  --learning_rate 0.0005 \
+  --optimizer AdamW \
+  --scheduler cosine \
+  --dropout 0.1 \
+  --residual distinct_source \
+  --heads 2 \
+  --positional_encoding \
+  --regression_loss_type smooth_l1 \
+  --model_name k562_release_all_interact
+
+# submit interaction types, mirna and rbp
+configs=(mirna rbp)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global_"${config}".yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_"${config}"
+done
+
+### Notes
+# potentially beneficial node types
+# ctcf, cpgislands, tfbindingsites
+# all node types
+# ctcf, cpgislands, tss, tfbindingsites, crms, se
+
+configs=(all_nodes)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_"${config}".yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_"${config}"
+done
+
+# replicate best model
+for rep in 1 2 3 4 5; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global.yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_replicate_"${rep}"
+done
+
+# submit model with adding different node types
+# cpgislands
+# crms
+# ctcfccre
+# superenahcners (check that these are in graph construction too)
+# tfbindingsites
+# tss annotations 
+configs=(cpgislands crms ctcf superenhancers tfbindingsites tss)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_"${config}".yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_"${config}"
+done
+
+# submit model with base-graph only
+# --graph_type base
+configs=(k562_allcontacts_global_localonly.yaml)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/"${config}" \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_localonly
+done
+
+# submit model with gene-gene interactions
+# gene-gene in config
+configs=(k562_allcontacts_global_gene_gene.yaml)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/"${config}" \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_gene_gene
+done
+
+# submit models with regulatory schemas
+# encode
+# epimap
+# k562_allcontacts_global_epimap
+configs=(epimap encode)
+for config in "${configs[@]}"; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_allcontacts_global_"${config}".yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --regression_loss_type smooth_l1 \
+    --model_name k562_release_"${config}"
+done
+
+
+
+
+
+
+
+for model in GAT; do
+  for dropout in 0.1 0.3; do
+    python ogl/omics_graph_learning/ogl_pipeline.py \
+      --partition RM \
+      --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+      --target rna_seq \
+      --model ${model} \
+      --gnn_layers 2 \
+      --linear_layers 2 \
+      --activation gelu \
+      --dimensions 200 \
+      --batch_size 16 \
+      --learning_rate 0.0005 \
+      --optimizer AdamW \
+      --scheduler cosine \
+      --dropout ${dropout} \
+      --residual distinct_source \
+      --heads 2 \
+      --positional_encoding \
+      --alpha 0.95 \
+      --regression_loss_type smooth_l1 \
+      --model_name k562_release_best_params_"${model}"_dropout_"${dropout}"_batch_16
+  done
+done
+
+for model in UniMPTransformer; do
+  for dropout in 0.5; do
+    python ogl/omics_graph_learning/ogl_pipeline.py \
+      --partition RM \
+      --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+      --target rna_seq \
+      --model ${model} \
+      --gnn_layers 2 \
+      --linear_layers 2 \
+      --activation gelu \
+      --dimensions 200 \
+      --batch_size 32 \
+      --learning_rate 0.0005 \
+      --optimizer AdamW \
+      --scheduler cosine \
+      --dropout ${dropout} \
+      --residual distinct_source \
+      --heads 2 \
+      --positional_encoding \
+      --alpha 0.95 \
+      --regression_loss_type smooth_l1 \
+      --model_name k562_release_best_params_"${model}"_dropout_"${dropout}"
+  done
+done
+
+# best so far! release versions
+# alpha 0.95
+# batch 32
+# dropout default of 0.3 and 0.1
+# lr default of 0.0005
+# best models so far: GAT, PNA, and UniMPTransformer
+# new best release model
+for model in GAT PNA UniMPTransformer; do
+  for dropout in 0.3 0.1; do
+    python ogl/omics_graph_learning/ogl_pipeline.py \
+      --partition RM \
+      --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+      --target rna_seq \
+      --model ${model} \
+      --gnn_layers 2 \
+      --linear_layers 2 \
+      --activation gelu \
+      --dimensions 200 \
+      --batch_size 32 \
+      --learning_rate 0.0005 \
+      --optimizer AdamW \
+      --scheduler cosine \
+      --dropout ${dropout} \
+      --residual distinct_source \
+      --heads 2 \
+      --positional_encoding \
+      --alpha 0.95 \
+      --model_name k562_release_best_params_"${model}"_dropout_"${dropout}"
+  done
+done
+
+# and with smooth l1 loss
+for model in GAT PNA UniMPTransformer; do
+  for dropout in 0.3 0.1; do
+    python ogl/omics_graph_learning/ogl_pipeline.py \
+      --partition RM \
+      --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+      --target rna_seq \
+      --model ${model} \
+      --gnn_layers 2 \
+      --linear_layers 2 \
+      --activation gelu \
+      --dimensions 200 \
+      --batch_size 32 \
+      --learning_rate 0.0005 \
+      --optimizer AdamW \
+      --scheduler cosine \
+      --dropout ${dropout} \
+      --residual distinct_source \
+      --heads 2 \
+      --positional_encoding \
+      --alpha 0.95 \
+      --regression_loss_type smooth_l1 \
+      --model_name k562_release_best_params_"${model}"_dropout_"${dropout}"_smoothl1
+  done
+done
+
+
+# adjust models
+for model in GAT GCN GraphSAGE PNA UniMPTransformer; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+    --target rna_seq \
+    --model ${model} \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --alpha 0.95 \
+    --model_name k562_release_alpha_0.95_"${model}"
+done
+
+# adjust batch size
+for batchsize in 32 128 256; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size ${batchsize} \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --alpha 0.95 \
+    --model_name k562_release_alpha_0.95_batch_"${batchsize}"
+done
+
+# adjust dropout
+# for dropout in 0.4 0.5; do
+for dropout in 0.2 0.1; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 64 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout ${dropout} \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --alpha 0.95 \
+    --model_name k562_release_alpha_0.95_dropout_"${dropout}"
+done
+
+# adjust learning rate
+# for lr in 0.0003 0.0001; do
+for lr in 0.001 0.005; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 32 \
+    --learning_rate ${lr} \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.3 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --alpha 0.95 \
+    --model_name k562_release_alpha_0.95_lr_"${lr}"_batch_32
+done
+
+
 #submit differnet alpha
-# 0.85 0.90 0.95 0.99
-for alpha in 0.85 0.90 0.95 0.99; do
+for alpha in 0.65 0.70 0.75 0.80 0.85 0.90 0.95; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
     --experiment_yaml ogl/configs/experiments/k562_release.yaml \

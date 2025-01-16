@@ -800,6 +800,7 @@ def main() -> None:
         split_name=args.split_name,
         regression_target=args.target,
         positional_encoding=args.positional_encoding,
+        randomize_node_feature_idx=args.randomize_node_feature_idx,
     ).make_data_object()
 
     # check data integreity

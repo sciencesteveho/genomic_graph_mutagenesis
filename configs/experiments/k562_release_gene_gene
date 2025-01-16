@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: k562_release_gene_gene
+experiment_name: k562_release_local_only
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 

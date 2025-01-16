@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: regulatory_only_k562_allcontacts_global_encode
+experiment_name: k562_release_encode
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 
@@ -53,15 +53,11 @@ log_transform: log2
 nodes:
   - tads
 
-onehot_node_feats: 2
-
 positional_encoding:
   build_positional_encoding: true
   train_positional_encoding: false
 
 rbp_network: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_network.txt
-
-rbp_proteins: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/rbp_proteins.txt
 
 regulatory_schema: encode
 

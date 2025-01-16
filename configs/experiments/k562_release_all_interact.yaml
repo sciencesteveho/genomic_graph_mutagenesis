@@ -30,17 +30,19 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: k562_release_gene_gene
+experiment_name: k562_release_all_interact
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 
 feat_window: 6250
 
-gene_gene: true
+gene_gene: false
 
 graph_type: full
 
-interaction_types: null
+interaction_types:
+  - mirna
+  - rbp
 
 k_fold: null
 

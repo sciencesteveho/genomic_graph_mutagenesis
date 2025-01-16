@@ -54,8 +54,6 @@ log_transform: log2
 nodes:
   - tads
 
-onehot_node_feats: 2
-
 positional_encoding:
   build_positional_encoding: true
   train_positional_encoding: false

@@ -65,6 +65,7 @@ class OGLCLIParser:
         self.add_configuration_arguments()
         self.add_model_arguments()
         self.add_boolean_flags()
+        self._add_perturbation_arguments()
 
     def add_configuration_arguments(self) -> None:
         """Add required arguments to the parser."""
@@ -181,7 +182,12 @@ class OGLCLIParser:
             type=int,
             help="Run number to specify for GNN training. If not specified, the pipeline will instead submit three jobs [0, 1, 2] and train three models across three seeds.",
         )
-        self.parser.add_argument("--alpha", type=float, default=0.85)
+        self.parser.add_argument(
+            "--alpha",
+            type=float,
+            default=0.85,
+            help="The amount to weight the regression task as part of the combination loss function. E.g. 0.85 means 85 percent of the loss is from the regression task and 15 percent is from the classification task.",
+        )
 
     def add_boolean_flags(self) -> None:
         """Add boolean flags to the parser."""
@@ -213,6 +219,7 @@ class OGLCLIParser:
             help="Type of node based perturbation to apply. Choose from either `zero_node_feats`, `randomize_node_feats`, `randomize_node_feat_order`, or pick the name of a specific feat to perturb",
         )
         self.parser.add_argument("--total_random_edges", type=int, default=None)
+        self.parser.add_argument("--randomize_node_feature_idx", type=int, default=None)
 
     def add_gnn_training_args(self) -> None:
         """Add arguments related to train_gnn.py"""

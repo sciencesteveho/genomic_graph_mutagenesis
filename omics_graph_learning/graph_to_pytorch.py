@@ -42,7 +42,42 @@ class GraphToPytorch:
     """Class to handle the conversion of graphs stored as np.arrays to tensors
     and ultimately to Pytorch Geometric Data objects.
 
-    Uses class PerturbationConfig to handle potential graph perturbations.
+    Methods:
+    --------
+    generate_edge_index:
+        Create the edge index tensor for the graph.
+    build_node_tensors:
+        Create the node tensors for the graph.
+    instantiate_data_object:
+        Create the PyG Data object.
+    create_masks:
+        Create masks for the Data object.
+    create_target_tensor:
+        Create the target values tensor for the Data object.
+    save_average_edges:
+        Save average edges for the graph as part of the data object.
+
+    Examples:
+    --------
+    # Import the parser
+    >>> from omics_graph_learning.graph_to_pytorch import GraphToPytorch
+
+    # Call make_data_object to create the PyG Data object
+    >>> data = GraphToPytorch(
+            experiment_config=experiment_config,
+            split_name=args.split_name,
+            regression_target=args.target,
+            positional_encoding=args.positional_encoding,
+        ).make_data_object()
+
+    # Call make_data_object but randomize the node feature tensor in idx 10
+    >>> data = GraphToPytorch(
+            experiment_config=experiment_config,
+            split_name=args.split_name,
+            regression_target=args.target,
+            positional_encoding=args.positional_encoding,
+            randomize_node_feature_idx=10,
+        ).make_data_object()
     """
 
     def __init__(
@@ -53,6 +88,7 @@ class GraphToPytorch:
         positional_encoding: Optional[bool],
         scaled_targets: bool = False,
         perturbation_config: Optional[PerturbationConfig] = None,
+        randomize_node_feature_idx: Optional[int] = None,
     ) -> None:
         """Initialize the GraphToPytorch object."""
         self.experiment_config = experiment_config
@@ -60,6 +96,7 @@ class GraphToPytorch:
         self.regression_target = regression_target
         self.scaled_targets = scaled_targets
         self.perturbation_config = perturbation_config
+        self.randomize_node_feature_idx = randomize_node_feature_idx
 
         if positional_encoding is not None:
             self.train_positional_encoding = positional_encoding
@@ -93,7 +130,7 @@ class GraphToPytorch:
             node_idxs=node_remove_edges,
         )
 
-    def create_node_tensors(self) -> torch.Tensor:
+    def build_node_tensors(self) -> torch.Tensor:
         """Create the node tensors for the graph."""
         if self.perturbation_config is not None:
             node_perturbation = get_node_perturbation(
@@ -106,12 +143,13 @@ class GraphToPytorch:
             graph_data=self.graph_data,
             perturbation=node_perturbation,
             positional_encoding=self.train_positional_encoding,
+            randomize_node_feature_idx=self.randomize_node_feature_idx,
         )
 
     def instantiate_data_object(self) -> Data:
         """Create the PyG Data object."""
         edge_index = self.generate_edge_index()
-        node_tensors = self.create_node_tensors()
+        node_tensors = self.build_node_tensors()
         return Data(x=node_tensors.contiguous(), edge_index=edge_index.contiguous())
 
     def create_masks(self, data: Data) -> Dict[str, torch.Tensor]:
@@ -403,34 +441,42 @@ def create_node_tensors(
     graph_data: dict,
     perturbation: Optional[NodePerturbation] = None,
     positional_encoding: bool = False,
+    randomize_node_feature_idx: Optional[int] = None,
 ) -> torch.Tensor:
     """Create the node tensors for the graph, perturbing if necessary according
     to input args.
 
     Args:
         graph_data (dict): The graph data dictionary.
-        node_perturbation (Optional[str]): The type of node perturbation to
+        perturbation (Optional[str]): The type of node perturbation to
         apply. Default is None.
-        zero_node_feats (bool): Flag indicating whether to zero out the node
-        features. Default is False.
-        randomize_feats (bool): Flag indicating whether to randomize the node
-        features. Default is False.
+        positional_encoding (bool): Whether to include positional encoding in
+        the node features. Default is False.
+        randomize_node_feature_idx (Optional[int]): The index of the node
+        feature to randomize. Default is None.
     """
+    # get node features with or without positional encoding
     if positional_encoding:
-        return torch.tensor(
-            np.concatenate(
-                (graph_data["node_feat"], graph_data["node_positional_encoding"]),
-                axis=1,
-            ),
-            dtype=torch.float,
-        )
-    elif perturbation is not None:
-        return torch.tensor(
-            perturb_node_features(perturbation, graph_data["node_feat"]),
-            dtype=torch.float,
+        node_feats = np.concatenate(
+            (graph_data["node_feat"], graph_data["node_positional_encoding"]),
+            axis=1,
         )
     else:
-        return torch.tensor(graph_data["node_feat"], dtype=torch.float)
+        node_feats = graph_data["node_feat"]
+
+    # apply perturbation from perturbation enum
+    if perturbation is not None:
+        node_feats = perturb_node_features(perturbation, node_feats)
+
+    # randomize node feature at index
+    if randomize_node_feature_idx is not None:
+        print(f"Randomizing node feature at index {randomize_node_feature_idx}")
+        if positional_encoding and randomize_node_feature_idx < 5:
+            raise ValueError("Cannot randomize positional encoding")
+
+        node_feats[:, randomize_node_feature_idx] = np.random.rand(node_feats.shape[0])
+
+    return torch.tensor(node_feats, dtype=torch.float)
 
 
 def create_mask(num_nodes: int, indices: torch.Tensor) -> torch.Tensor:
