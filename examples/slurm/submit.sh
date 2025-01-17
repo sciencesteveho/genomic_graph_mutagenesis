@@ -28,6 +28,29 @@ conda activate /ocean/projects/bio210019p/stevesho/ogl
 # k562_release_best_params_GAT_dropout_0.1_smoothl1 
 
 # submit best model + randomized node features per idx
+for node in {5..41}; do
+  python ogl/omics_graph_learning/ogl_pipeline.py \
+    --partition RM \
+    --experiment_yaml ogl/configs/experiments/k562_release.yaml \
+    --target rna_seq \
+    --model GAT \
+    --gnn_layers 2 \
+    --linear_layers 2 \
+    --activation gelu \
+    --dimensions 200 \
+    --batch_size 16 \
+    --learning_rate 0.0005 \
+    --optimizer AdamW \
+    --scheduler cosine \
+    --dropout 0.1 \
+    --residual distinct_source \
+    --heads 2 \
+    --positional_encoding \
+    --alpha 0.95 \
+    --regression_loss_type smooth_l1 \
+    --randomize_node_feature_idx ${node} \
+    --model_name k562_release_randomize_node_${node}
+done
 
 # k562_release_all_nodes_and_interact.yaml
 python ogl/omics_graph_learning/ogl_pipeline.py \
@@ -39,7 +62,7 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
   --linear_layers 2 \
   --activation gelu \
   --dimensions 200 \
-  --batch_size 32 \
+  --batch_size 16 \
   --learning_rate 0.0005 \
   --optimizer AdamW \
   --scheduler cosine \
@@ -59,7 +82,7 @@ python ogl/omics_graph_learning/ogl_pipeline.py \
   --linear_layers 2 \
   --activation gelu \
   --dimensions 200 \
-  --batch_size 32 \
+  --batch_size 16 \
   --learning_rate 0.0005 \
   --optimizer AdamW \
   --scheduler cosine \
@@ -82,7 +105,7 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -111,7 +134,7 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -134,7 +157,7 @@ for rep in 1 2 3 4 5; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -164,7 +187,7 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -189,7 +212,7 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -214,7 +237,7 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -241,7 +264,7 @@ for config in "${configs[@]}"; do
     --linear_layers 2 \
     --activation gelu \
     --dimensions 200 \
-    --batch_size 32 \
+    --batch_size 16 \
     --learning_rate 0.0005 \
     --optimizer AdamW \
     --scheduler cosine \
@@ -252,11 +275,6 @@ for config in "${configs[@]}"; do
     --regression_loss_type smooth_l1 \
     --model_name k562_release_"${config}"
 done
-
-
-
-
-
 
 
 for model in GAT; do
@@ -285,7 +303,7 @@ for model in GAT; do
 done
 
 for model in UniMPTransformer; do
-  for dropout in 0.5; do
+  for dropout in 0.1 0.3; do
     python ogl/omics_graph_learning/ogl_pipeline.py \
       --partition RM \
       --experiment_yaml ogl/configs/experiments/k562_release.yaml \
@@ -295,7 +313,7 @@ for model in UniMPTransformer; do
       --linear_layers 2 \
       --activation gelu \
       --dimensions 200 \
-      --batch_size 32 \
+      --batch_size 16 \
       --learning_rate 0.0005 \
       --optimizer AdamW \
       --scheduler cosine \
@@ -305,7 +323,7 @@ for model in UniMPTransformer; do
       --positional_encoding \
       --alpha 0.95 \
       --regression_loss_type smooth_l1 \
-      --model_name k562_release_best_params_"${model}"_dropout_"${dropout}"
+      --model_name k562_release_best_params_"${model}"_dropout_"${dropout}"_batch_16
   done
 done
 

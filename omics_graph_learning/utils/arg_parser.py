@@ -65,7 +65,7 @@ class OGLCLIParser:
         self.add_configuration_arguments()
         self.add_model_arguments()
         self.add_boolean_flags()
-        self._add_perturbation_arguments()
+        self.add_perturbation_arguments()
 
     def add_configuration_arguments(self) -> None:
         """Add required arguments to the parser."""
