@@ -1,7 +1,7 @@
 ---
 attribute_references:
   gencode: gencode_v26_node_attr.bed
-  mirna: mirbase_mirnas.bed
+  mirna: ensembl_mirna_coordinates_hg38.bed
   mirnatargets: mirtargets_filtered.txt
   ref_dir: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references
   super_enhancers: se_node_attr.bed
@@ -30,7 +30,7 @@ derived_directories:
 
 differentiate_tf: false
 
-experiment_name: regulatory_only_k562_allcontacts_all_nodes
+experiment_name: k562_release_all_nodes
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 
