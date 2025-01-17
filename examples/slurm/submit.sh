@@ -147,7 +147,7 @@ for config in "${configs[@]}"; do
 done
 
 # replicate best model
-for rep in 1 2 3 4 5; do
+for rep in 1 2 3; do
   python ogl/omics_graph_learning/ogl_pipeline.py \
     --partition RM \
     --experiment_yaml ogl/configs/experiments/k562_allcontacts_global.yaml \
