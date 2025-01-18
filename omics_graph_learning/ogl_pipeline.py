@@ -256,18 +256,18 @@ class PipelineRunner:
         with contextlib.suppress(AttributeError):
             if args.total_random_edges:
                 if args.edge_perturbation == "randomize_edges":
-                    train_args += f" --total_random_edges {args.total_random_edges}"
+                    train_args += f" --total_random_edges {args.total_random_edges} "
                 else:
                     raise ValueError(
                         "`total_random_edges` should only be set when `randomize_edges` is True"
                     )
             if args.node_perturbation:
-                train_args += f" --node_perturbation {args.node_perturbation}"
+                train_args += f" --node_perturbation {args.node_perturbation} "
             if args.edge_perturbation:
-                train_args += f" --edge_perturbation {args.edge_perturbation}"
+                train_args += f" --edge_perturbation {args.edge_perturbation} "
             if args.randomize_node_feature_idx:
                 train_args += (
-                    f" --randomize_node_feature_idx {args.randomize_node_feature_idx}"
+                    f" --randomize_node_feature_idx {args.randomize_node_feature_idx} "
                 )
         return train_args + bool_flags
 
