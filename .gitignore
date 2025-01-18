@@ -7,3 +7,4 @@ omics_graph_learning.egg-info/
 test/__pycache__
 test/deprecated
 figures/
+examples/slurm/submit.sh
