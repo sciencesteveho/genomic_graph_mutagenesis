@@ -102,7 +102,9 @@ def load_data_and_model(
 def get_baseline_predictions(
     data: Data, mask: str, runner: PerturbRunner
 ) -> pd.DataFrame:
-    """Evaluate the model on a given mask and return predictions as a DataFrame."""
+    """Evaluate the model on a given mask and return predictions as a
+    DataFrame.
+    """
     data = combine_masks(data)
     test_loader = NeighborLoader(
         data,

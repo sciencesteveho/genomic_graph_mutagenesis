@@ -120,10 +120,14 @@ class PerturbRunner:
                 - regression_labels: True labels for regression.
                 - node_indices: Original node indices corresponding to the
                   predictions.
+                - classification_outs: Predictions for classification.
+                - classification_labels: True labels for classification
         """
         self.model.eval()
-        regression_outs, regression_labels = [], []
-        node_indices = []
+
+        regression_outs = regression_labels = classification_outs = (
+            classification_labels
+        ) = node_indices = []
 
         pbar = tqdm(total=len(data_loader))
         pbar.set_description(
@@ -143,7 +147,7 @@ class PerturbRunner:
                 continue
 
             # forward pass
-            regression_out, _ = self.model(
+            regression_out, class_logits = self.model(
                 x=data.x,
                 edge_index=data.edge_index,
                 mask=mask_tensor,
@@ -152,16 +156,26 @@ class PerturbRunner:
             # collect masked outputs and labels
             regression_out_masked = regression_out[mask_tensor]
             labels_masked = data.y[mask_tensor]
+
+            class_out_masked = class_logits[mask_tensor]
+            class_labels_masked = data.class_labels[mask_tensor]
+
             batch_node_indices = data.n_id[mask_tensor].cpu()
 
             # ensure tensors are at least one-dimensional
             if regression_out_masked.dim() == 0:
                 regression_out_masked = regression_out_masked.unsqueeze(0)
                 labels_masked = labels_masked.unsqueeze(0)
+                class_out_masked = class_out_masked.unsqueeze(0)
+                class_labels_masked = class_labels_masked.unsqueeze(0)
                 batch_node_indices = batch_node_indices.unsqueeze(0)
 
             regression_outs.append(regression_out_masked.cpu())
             regression_labels.append(labels_masked.cpu())
+
+            classification_outs.append(class_out_masked.cpu())
+            classification_labels.append(class_labels_masked.cpu())
+
             node_indices.append(batch_node_indices)
 
             pbar.update(1)
@@ -170,13 +184,23 @@ class PerturbRunner:
         if regression_outs:
             regression_outs = torch.cat(regression_outs, dim=0)
             regression_labels = torch.cat(regression_labels, dim=0)
+            classification_outs = torch.cat(classification_outs, dim=0)
+            classification_labels = torch.cat(classification_labels, dim=0)
             node_indices = torch.cat(node_indices, dim=0)
         else:
             regression_outs = torch.tensor([])
             regression_labels = torch.tensor([])
+            classification_outs = torch.tensor([])
+            classification_labels = torch.tensor([])
             node_indices = torch.tensor([])
 
-        return regression_outs, regression_labels, node_indices
+        return (
+            regression_outs,
+            regression_labels,
+            node_indices,
+            classification_outs,
+            classification_labels,
+        )
 
     @torch.no_grad()
     def evaluate_single(
