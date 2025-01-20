@@ -21,6 +21,7 @@ import pandas as pd
 from omics_graph_learning.utils.common import _get_chromatin_loop_file
 from omics_graph_learning.utils.common import check_and_symlink
 from omics_graph_learning.utils.common import dir_check_make
+from omics_graph_learning.utils.common import get_physical_cores
 from omics_graph_learning.utils.common import time_decorator
 from omics_graph_learning.utils.config_handlers import ExperimentConfig
 from omics_graph_learning.utils.config_handlers import TissueConfig
@@ -81,6 +82,8 @@ class GenomeDataPreprocessor:
 
     >>> preprocessObject.prepare_data_files()
     """
+
+    cores = get_physical_cores()
 
     def __init__(
         self,
@@ -281,7 +284,7 @@ class GenomeDataPreprocessor:
         cat_files = " ".join([shlex.quote(f"{path}/{bed}") for bed in beds])
 
         cmd = f"cat {cat_files} \
-                | sort -k1,1 -k2,2n \
+                | LC_ALL=C sort --parallel={self.cores} -S 55% -k1,1 -k2,2n \
                 | bedtools merge -i - -c 11 -o mean \
                 > {path}/merged_cpgs.bed"
 
@@ -325,7 +328,7 @@ class GenomeDataPreprocessor:
 
         if self.methylation["cpg_filetype"] == "ENCODE":
             filtered_file = f"{self.tissue_dir}/unprocessed/{cpg_bed}_gt80"
-            gt_gc = f"awk -v FS='\t' -v OFS='\t' '${cpg_percent_col} >= 80' {self.tissue_dir}/unprocessed/{bed} \
+            gt_gc = f"awk -v FS='\t' -v OFS='\t' '${cpg_percent_col} >= 80' {self.tissue_dir}/unprocessed/{cpg_bed} \
                 > {filtered_file}"
             self._run_cmd(gt_gc)
             final_bed = filtered_file
