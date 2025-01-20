@@ -301,7 +301,7 @@ class GenomeDataPreprocessor:
         # merge multiple cpg files if necessary
         if isinstance(bed, list):
             self._combine_cpg_files(beds=bed, path=f"{self.tissue_dir}/unprocessed")
-            cpg_bed = "merged_cpgs"
+            cpg_bed = "merged_cpgs.bed"
             cpg_percent_col = 4
         else:
             cpg_bed = bed
