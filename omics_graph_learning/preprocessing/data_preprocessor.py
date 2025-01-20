@@ -371,6 +371,7 @@ class GenomeDataPreprocessor:
                 )
 
         ### Make symlink for cpg
+        print(f"Processing methylation data {self.methylation['cpg']}")
         if type(self.methylation["cpg"]) == list:
             for cpg in self.methylation["cpg"]:
                 src = self.data_dir / cpg

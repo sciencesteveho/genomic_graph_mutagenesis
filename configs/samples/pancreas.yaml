@@ -51,7 +51,8 @@ local:
   tss: tss_parsed_hg38.bed
 
 methylation:
-  cpg: ENCFF080TDH.bed
+  cpg:
+    - ENCFF080TDH.bed
     - ENCFF556VBV.bed
     - ENCFF689HVV.bed
   cpg_filetype: ENCODE
