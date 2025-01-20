@@ -14,7 +14,6 @@ See `ogl/configs/experiments` for examples.
 | `chromfile`  | Full path to an h38 chromosome size file. |
 | `config_dir` | Full path to where configs for OGL will be stored. |
 | `derived_directories`  | These are directories deriving from the root directory. Create the directory structure as in the README and leave these untouched. |
-| `differentiate_tf`                     | Add a one-hot encoded feature to differentiate between transcription factors and their genes.  |
 | `experiment_name`                     | Name of the experiment (user specified).  |
 | `fasta`                     | Full path to an hg38 fasta file.  |
 | `feat_window`                     | Size of the window for which edges get drawn between two features in linear proximity. Default is `6250` base pairs.  |
