@@ -264,6 +264,15 @@ class GenomeDataPreprocessor:
                 f.write("%s\n" % item)
 
     @time_decorator(print_args=True)
+    def _bigwig_to_filtered_bedgraph(self, path: str, file: str) -> str:
+        """Convert bigwig to bedgraph file"""
+        convert_cmd = f"{self.reference_dir}/bigWigToBedGraph {path}/{file}.bigwig {path}/{file}.bedGraph"
+        filter_cmd = f"awk '$4 >= 0.8' {path}/{file}.bedGraph > {path}/{file}_gt80.bed"
+        for cmd in [convert_cmd, filter_cmd]:
+            self._run_cmd(cmd)
+        return f"{file}_gt80.bed"
+
+    @time_decorator(print_args=True)
     def _combine_cpg_files(self, beds: List[str], path: str) -> None:
         """Combined methylation signal across CpGs and average by dividing by
         the amount of files combined.
@@ -274,15 +283,6 @@ class GenomeDataPreprocessor:
                 > {path}/merged_cpgs.bed"
 
         self._run_cmd(cmd)
-
-    @time_decorator(print_args=True)
-    def _bigwig_to_filtered_bedgraph(self, path: str, file: str) -> str:
-        """Convert bigwig to bedgraph file"""
-        convert_cmd = f"{self.reference_dir}/bigWigToBedGraph {path}/{file}.bigwig {path}/{file}.bedGraph"
-        filter_cmd = f"awk '$4 >= 0.8' {path}/{file}.bedGraph > {path}/{file}_gt80.bed"
-        for cmd in [convert_cmd, filter_cmd]:
-            self._run_cmd(cmd)
-        return f"{file}_gt80.bed"
 
     @time_decorator(print_args=True)
     def _merge_cpg(self, bed: Union[str, List[str]]) -> None:
@@ -371,12 +371,21 @@ class GenomeDataPreprocessor:
                 )
 
         ### Make symlink for cpg
-        src = self.data_dir / self.methylation["cpg"]
-        dst = self.tissue_dir / "unprocessed" / self.methylation["cpg"]
-        check_and_symlink(
-            src=src,
-            dst=dst,
-        )
+        if type(self.methylation["cpg"]) == list:
+            for cpg in self.methylation["cpg"]:
+                src = self.data_dir / cpg
+                dst = self.tissue_dir / "unprocessed" / cpg
+                check_and_symlink(
+                    src=src,
+                    dst=dst,
+                )
+        else:
+            src = self.data_dir / self.methylation["cpg"]
+            dst = self.tissue_dir / "unprocessed" / self.methylation["cpg"]
+            check_and_symlink(
+                src=src,
+                dst=dst,
+            )
 
         if self.nodes is not None:
             if "crms" in self.nodes:

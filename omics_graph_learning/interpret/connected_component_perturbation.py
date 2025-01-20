@@ -112,15 +112,15 @@ def compute_hop_distances(sub_data: Data, gene_node: int) -> Dict[int, int]:
     return nx.single_source_shortest_path_length(subgraph_nx, gene_node)
 
 
-def remove_node_and_predict(
+def remove_nodes_and_predict(
     runner: PerturbRunner,
     sub_data: Data,
-    node_to_remove: int,
+    nodes_to_remove: List[int],
     gene_node: int,
     device: torch.device,
     mask_attr: str = "all",
 ) -> Optional[float]:
-    """Remove the specified node from the subgraph, then compute the model's
+    """Remove the specified nodes from the subgraph, then compute the model's
     prediction for the gene node in the perturbed subgraph.
 
     Args:
@@ -135,6 +135,9 @@ def remove_node_and_predict(
         Optional[float]: The perturbation prediction for the gene node, or None
         if the gene_node is missing in the perturbed subgraph.
     """
+    if not nodes_to_remove:
+        return None
+
     mask_tensor = getattr(sub_data, f"{mask_attr}_mask_loss")
 
     try:

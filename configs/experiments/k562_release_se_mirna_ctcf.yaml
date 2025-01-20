@@ -28,8 +28,6 @@ derived_directories:
   target_dir: shared_data/targets
   tpm_dir: shared_data/targets/tpm
 
-differentiate_tf: false
-
 experiment_name: k562_release_se_mirna_ctcf
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
@@ -42,8 +40,6 @@ graph_type: full
 
 interaction_types:
   - mirna
-
-k_fold: null
 
 liftover: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/liftOver
 
