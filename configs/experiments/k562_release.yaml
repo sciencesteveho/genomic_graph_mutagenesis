@@ -28,8 +28,6 @@ derived_directories:
   target_dir: shared_data/targets
   tpm_dir: shared_data/targets/tpm
 
-differentiate_tf: false
-
 experiment_name: k562_allcontacts_global_release
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
@@ -41,8 +39,6 @@ gene_gene: false
 graph_type: full
 
 interaction_types: null
-
-k_fold: null
 
 liftover: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/liftOver
 

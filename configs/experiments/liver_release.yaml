@@ -28,7 +28,7 @@ derived_directories:
   target_dir: shared_data/targets
   tpm_dir: shared_data/targets/tpm
 
-experiment_name: small_intestine_release
+experiment_name: liver_release
 
 fasta: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/hg38.fa
 
@@ -60,7 +60,7 @@ regulatory_schema: intersect
 root_dir: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing
 
 tissues:
-  - small_intestine
+  - liver
 
 training_targets:
   average_activity_df: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/matrices/average_activity_df.pkl

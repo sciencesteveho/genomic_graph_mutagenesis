@@ -103,10 +103,6 @@ class EdgeParser:
             experiment_config=experiment_config, tissue_config=tissue_config
         )
 
-        self.tf_extension = ""
-        if experiment_config.differentiate_tf == True:
-            self.tf_extension += "_tf"
-
         self._initialize_directories_and_vars()
         self._initialize_references()
 

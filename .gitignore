@@ -8,3 +8,4 @@ test/__pycache__
 test/deprecated
 figures/
 examples/slurm/submit.sh
+configs/deprecated

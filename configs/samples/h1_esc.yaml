@@ -23,9 +23,7 @@ interaction:
   gct: GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct
   gencode: gencode_v26_genes_only_with_GTEx_targets.bed
   id_lookup: gencode_to_genesymbol_lookup_table.txt
-  mirdip: null
-  mirnatargets: null
-  tf_marker: null
+  mirna: ENCFF851ANC.tsv
 
 local:
   cnv: cnv_hg38.bed
@@ -67,7 +65,6 @@ resources:
   reftss_genes: /ocean/projects/bio210019p/stevesho/resources/reftss_annotated.bed
   se_ref: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/se_node_attr.bed
   tf_motifs: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/references/collapsed_motifs_overlapping_consensus_footprints_hg38.bed
-  tpm: null
   tissue: h1_esc
   rna: /ocean/projects/bio210019p/stevesho/data/preprocess/graph_processing/shared_data/targets/tpm/ENCFF910OBU.tsv
   marker_name: H1_ESC

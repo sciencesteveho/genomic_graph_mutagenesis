@@ -11,6 +11,7 @@ import pickle
 from typing import Dict, List, Tuple
 
 import pandas as pd
+from scipy.stats import pearsonr  # type: ignore
 import torch
 from torch_geometric.data import Data  # type: ignore
 from torch_geometric.loader import NeighborLoader  # type: ignore
@@ -114,42 +115,59 @@ def get_baseline_predictions(
         shuffle=False,
     )
 
-    preds, labels, node_indices = runner.evaluate(
-        data_loader=test_loader, epoch=0, mask=mask
-    )
+    (
+        regression_outs,
+        regression_labels,
+        node_indices,
+        classification_outs,
+        classification_labels,
+    ) = runner.evaluate(data_loader=test_loader, epoch=0, mask=mask)
 
     # ensure shape alignment
-    preds = preds.squeeze()
-    labels = labels.squeeze()
+    regression_outs = regression_outs.squeeze()
+    regression_labels = regression_labels.squeeze()
     node_indices = node_indices.squeeze()
+    classification_outs = classification_outs.squeeze()
+    classification_labels = classification_labels.squeeze()
 
     assert (
-        preds.shape[0] == labels.shape[0] == node_indices.shape[0]
+        regression_outs.shape[0]
+        == regression_labels.shape[0]
+        == node_indices.shape[0]
+        == classification_outs.shape[0]
+        == classification_labels.shape[0]
     ), "Mismatch in tensor shapes."
 
     return pd.DataFrame(
         {
             "node_idx": node_indices.cpu().numpy(),
-            "prediction": preds.cpu().numpy(),
-            "label": labels.cpu().numpy(),
+            "prediction": regression_outs.cpu().numpy(),
+            "label": regression_labels.cpu().numpy(),
+            "class_logits": classification_outs.cpu().numpy(),
+            "class_label": classification_labels.cpu().numpy(),
         }
     )
 
 
 def get_best_predictions(
     df: pd.DataFrame,
-    node_idx_to_gene_id: Dict[int, str],
     gene_indices: List[int],
-    topk: int = 100,
-    prediction_threshold: float = 5.0,
-    output_prefix: str = "",
+    node_idx_to_gene_id: Dict[int, str],
     gencode_to_symbol: Dict[str, str] = None,
+    output_prefix: str = "",
     sample: str = "k562",
+    max_low_genes: int = 500,
+    min_pearson_r: float = 0.80,
 ) -> Tuple[List[int], pd.DataFrame]:
-    """Find topK gene nodes past a threshold.
+    """Get predictions for genes given a certain threshold.
 
-    Returns:
-        (list_of_node_indices, sub-DataFrame).
+    1. We first compute Pearosn R for each gene across all data points
+    2. We bin by mean label:
+        - high if >=5
+        - medium if >= 1 and < 5
+        - low if > 0 and < 1
+    3. We keep all the genes in high and medium, but cap the number of low
+    5. Write the final gene symbols to a file for reference
     """
     if gencode_to_symbol is None:
         gencode_to_symbol = {}

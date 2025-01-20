@@ -50,14 +50,12 @@ class ExperimentConfig:
     blacklist: str
     chromfile: str
     config_dir: Path
-    differentiate_tf: bool
     experiment_name: str
     fasta: str
     feat_window: int
     gene_gene: bool
     graph_type: str
     interaction_types: List[str]
-    k_fold: int
     liftover: str
     liftover_chain: str
     log_transform: str

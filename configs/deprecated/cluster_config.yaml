@@ -1,6 +1,0 @@
-__default__:
-  account: bio210019p
-  partition: RM-shared
-  time: 24:00:00
-  ntasks-per-node: 24
-  output: slurm_outputs/%x_%j.out
