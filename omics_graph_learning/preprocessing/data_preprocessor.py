@@ -12,6 +12,7 @@ file formatting."""
 from collections import defaultdict
 import contextlib
 import csv
+import shlex
 import subprocess
 from typing import Dict, List, Union
 
@@ -277,8 +278,10 @@ class GenomeDataPreprocessor:
         """Combined methylation signal across CpGs and average by dividing by
         the amount of files combined.
         """
-        cmd = f"cat {' '.join([f'{path}/{bed}' for bed in beds])} \
-                | sort -k1,1, -k2,2n \
+        cat_files = " ".join([shlex.quote(f"{path}/{bed}") for bed in beds])
+
+        cmd = f"cat {cat_files} \
+                | sort -k1,1 -k2,2n \
                 | bedtools merge -i - -c 11 -o mean \
                 > {path}/merged_cpgs.bed"
 
